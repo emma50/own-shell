@@ -9,10 +9,10 @@ const rl = createInterface({
 function prompt() {
   rl.question("$ ", (answer: string) => {
     // // Exit the terminal on "exit" command
-    // if (answer === "exit") {
-    //   rl.close();
-    //   return;
-    // }
+    if (answer === "exit") {
+      rl.close();
+      return;
+    }
 
     // console.log(`${answer}: command not found`)
 

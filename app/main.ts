@@ -8,9 +8,16 @@ const rl = createInterface({
 // TODO: Uncomment the code below to pass the first stage
 function prompt() {
   rl.question("$ ", (answer: string) => {
+    // Exit the terminal on "exit" command
+    if (answer === "exit") {
+      rl.close();
+      return;
+    }
+
     console.log(`${answer}: command not found`)
+
+    // Repeat the prompt
     prompt()
-    // rl.close();
   })
 }
 

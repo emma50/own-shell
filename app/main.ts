@@ -18,7 +18,7 @@ function prompt() {
     const trimmed = answer.trim();
 
     if (trimmed.length === 0) {
-      return prompt();
+      prompt();
     }
 
     const [command, ...args] = trimmed.split(" ");
@@ -32,15 +32,14 @@ function prompt() {
       else {
         console.log(`${first}: not found`)
       }
-    }
-
-    if (command === "echo") {
+    } else if (command === "echo") {
+      if (args.length === 0) {
+        console.log()
+      }
       console.log(args.join(" "))
+    } else {
+      console.log(`${command}: command not found`)
     }
-
-    // else {
-    //   console.log(`${command}: command not found`)
-    // }
 
     // Repeat the prompt
     prompt()

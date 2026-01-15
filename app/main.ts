@@ -6,7 +6,12 @@ const rl = createInterface({
 });
 
 // TODO: Uncomment the code below to pass the first stage
-rl.question("$ ", (answer: string) => {
-  console.log(`${answer}: command not found`)
-  rl.close();
-});
+function prompt() {
+  rl.question("$ ", (answer: string) => {
+    console.log(`${answer}: command not found`)
+    prompt()
+    // rl.close();
+  })
+}
+
+prompt()

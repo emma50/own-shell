@@ -7,6 +7,7 @@ const rl = createInterface({
 
 // TODO: Uncomment the code below to pass the first stage
 function prompt() {
+  const builtInCommands = ["echo", "exit", "type"];
   rl.question("$ ", (answer: string) => {
     // // Exit the terminal on "exit" command
     if (answer === "exit") {
@@ -24,9 +25,9 @@ function prompt() {
 
     if (command === "type") {
       const [first] = args
-      
-      if ((first === "echo") || (first === "exit")) {
-        console.log(`${first} is a builtin shell`)
+
+      if (builtInCommands.includes(first)) {
+        console.log(`${first} is a shell builtin`)
       }
       else {
         console.log(`${first}: not found`)

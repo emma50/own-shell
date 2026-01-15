@@ -14,8 +14,6 @@ function prompt() {
       return;
     }
 
-    // console.log(`${answer}: command not found`)
-
     const trimmed = answer.trim();
 
     if (trimmed.length === 0) {
@@ -24,12 +22,24 @@ function prompt() {
 
     const [command, ...args] = trimmed.split(" ");
 
+    if (command === "type") {
+      const [first] = args
+      
+      if ((first === "echo") || (first === "exit")) {
+        console.log(`${first} is a builtin shell`)
+      }
+      else {
+        console.log(`${first}: not found`)
+      }
+    }
+
     if (command === "echo") {
       console.log(args.join(" "))
     }
-    else {
-      console.log(`${command}: command not found`)
-    }
+
+    // else {
+    //   console.log(`${command}: command not found`)
+    // }
 
     // Repeat the prompt
     prompt()

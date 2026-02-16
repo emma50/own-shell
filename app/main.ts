@@ -55,6 +55,9 @@ function prompt() {
       } else {
         console.log(args.join(" "));
       }
+    } else {
+      // ✅ Default case for unknown commands
+      console.log(`${command}: command not found`);
     }
 
     // Repeat the prompt

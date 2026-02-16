@@ -1,6 +1,5 @@
 import { createInterface } from "readline";
-import fs from "fs";
-import path from "path";
+import { execSync } from "child_process";
 
 const rl = createInterface({
   input: process.stdin,
@@ -36,49 +35,17 @@ function prompt() {
       if (builtInCommands.includes(first)) {
         console.log(`${first} is a shell builtin`);
       } else {
-        // - Gets system PATH directories.
-        // - On Windows, also gets PATHEXT extensions and - considers executable extensions (.EXE, .CMD, etc.).
-        const envPath = process.env.PATH || "";
-        const pathDirs = envPath.split(path.delimiter).filter(Boolean);
+        // On Windows, the `where` command is used to find the location of executables, while on Unix-like systems, the `which` command serves the same purpose.
         const isWindows = process.platform === "win32";
-        const pathexts = isWindows
-          ? (process.env.PATHEXT || ".EXE;.CMD;.BAT;.COM").split(";")
-          : [];
 
-        let found = false;
-
-        // Iterates through PATH directories and checks for the command's existence and executability.
-        for (const dir of pathDirs) {
-          const base = path.join(dir, command);
-          const candidates = isWindows
-            ? pathexts.map((ext: any) => base + ext)
-            : [base];
-
-          // Checks if any candidate file exists and is executable.
-          // - If found, prints the full path.
-          for (const candidate of candidates) {
-            try {
-              const stats = fs.statSync(candidate);
-              if (!stats.isFile()) continue;
-              try {
-                fs.accessSync(candidate, fs.constants.X_OK);
-                console.log(`${command} is ${candidate}`);
-                found = true;
-                break;
-              } catch {
-                // Not executable, skip to next candidate
-                continue;
-              }
-            } catch {
-              // File doesn't exist, continue
-              continue;
-            }
-          }
-          if (found) break;
-        }
-
-        if (!found) {
-          console.log(`${command}: not found`);
+        try {
+          const result = execSync(
+            isWindows ? `where ${first}` : `which ${first}`,
+            { stdio: "pipe" },
+          );
+          console.log(`${first} is ${result.toString().trim()}`);
+        } catch {
+          console.log(`${first}: not found`);
         }
       }
     } else if (command === "echo") {

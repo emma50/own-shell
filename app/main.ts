@@ -45,18 +45,16 @@ function prompt() {
     } else if (command === findExecutables(command)?.command) {
       // If the command is found in the system's PATH, it executes the command with the provided arguments.
       try {
-        const result = execSync(`${command} ${args.join(" ")}`, {
-          stdio: "inherit",
-        });
-        console.log(
-          `Program was passed ${args.length + 1} args including (including program name)`,
-        );
+        execSync(`${command} ${args.join(" ")}`, { stdio: "inherit" });
       } catch (error) {
         console.error(`Error executing command: ${error}`);
       }
     } else {
       // ✅ Default case for unknown commands
-      console.log(`${command}: command not found`);
+      // console.log(`${command}: command not found`);
+      console.log(
+        `Program was passed ${args.length + 1} args including (including program name)`,
+      );
     }
     // Repeat the prompt
     prompt();

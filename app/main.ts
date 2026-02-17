@@ -48,6 +48,9 @@ function prompt() {
         const result = execSync(`${command} ${args.join(" ")}`, {
           stdio: "inherit",
         });
+        console.log(
+          `Program was passed ${args.length + 1} args including (including program name)`,
+        );
       } catch (error) {
         console.error(`Error executing command: ${error}`);
       }

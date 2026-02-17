@@ -35,34 +35,58 @@ function prompt() {
       if (builtInCommands.includes(first)) {
         console.log(`${first} is a shell builtin`);
       } else {
-        // On Windows, the `where` command is used to find the location of executables, while on Unix-like systems, the `which` command serves the same purpose.
-        const isWindows = process.platform === "win32";
-
         try {
-          const result = execSync(
-            isWindows ? `where ${first}` : `which ${first}`,
-            { stdio: "pipe" },
-          );
-          console.log(`${first} is ${result.toString().trim()}`);
+          const result = findExecutables(first);
+          console.log(`${first} is ${JSON.stringify(result?.location)}`);
         } catch {
           console.log(`${first}: not found`);
         }
       }
-    } else if (command === "echo") {
-      // Prints the arguments joined by spaces. If no arguments are provided, it prints an empty line.
-      if (args.length === 0) {
-        console.log();
-      } else {
-        console.log(args.join(" "));
+    } else if (command === findExecutables(command)?.command) {
+      // If the command is found in the system's PATH, it executes the command with the provided arguments.
+      try {
+        const result = execSync(`${command} ${args.join(" ")}`, {
+          stdio: "inherit",
+        });
+      } catch (error) {
+        console.error(`Error executing command: ${error}`);
       }
     } else {
       // ✅ Default case for unknown commands
       console.log(`${command}: command not found`);
     }
-
     // Repeat the prompt
     prompt();
   });
+}
+
+const findExecutables = (executable: string) => {
+  // On Windows, the `where` command is used to find the location of executables, while on Unix-like systems, the `which` command serves the same purpose.
+  const isWindows = process.platform === "win32";
+
+  try {
+    const result = execSync(
+      isWindows ? `where ${executable}` : `which ${executable}`,
+      { stdio: "pipe" },
+    );
+
+    const output = result.toString().trim();
+
+    return {
+      location: output,
+      isExecutable: !!getFileName(output),
+      command: getFileName(output),
+    };
+  } catch {
+    console.log(`${executable}: not found`);
+  }
+};
+
+function getFileName(filePath: string) {
+  // Get the last part of the path (cat.exe)
+  const baseName = filePath.split("\\").pop();
+  // Remove the extension (.exe)
+  return (baseName as string).replace(/\.[^/.]+$/, "");
 }
 
 prompt();

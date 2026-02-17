@@ -53,7 +53,7 @@ function prompt() {
       // ✅ Default case for unknown commands
       // console.log(`${command}: command not found`);
       console.log(
-        `Program was passed ${args.length + 1} args including (including program name)`,
+        `Program was passed ${args.length + 1} args (including program name).`,
       );
     }
     // Repeat the prompt

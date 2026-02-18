@@ -58,7 +58,7 @@ function prompt() {
     const [command, ...args] = answer.split(" ");
 
     if (command === "type") {
-      const builtInCommands = ["echo", "exit", "type"];
+      const builtInCommands = ["echo", "exit", "type", "pwd"];
       const [first] = args;
 
       if (!first) {

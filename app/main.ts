@@ -63,9 +63,11 @@ function prompt() {
       if (builtInCommands.includes(first)) {
         console.log(`${first} is a shell builtin`);
       } else {
-        try {
-          console.log(`${first} is ${findExecutable(first)?.location}`);
-        } catch {
+        const executableInfo = findExecutable(first);
+
+        if (executableInfo && executableInfo.location) {
+          console.log(`${first} is ${executableInfo.location}`);
+        } else {
           console.log(`${first}: not found`);
         }
       }

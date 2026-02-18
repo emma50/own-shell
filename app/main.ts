@@ -1,5 +1,6 @@
 import { createInterface } from "readline";
 import { exec, execSync } from "child_process";
+import fs from "fs";
 
 const rl = createInterface({
   input: process.stdin,
@@ -35,6 +36,20 @@ function getFileName(filePath: string) {
   return (baseName as string).replace(/\.[^/.]+$/, "");
 }
 
+function cd(path: string) {
+  // Check if the path exists and is a directory
+  if (fs.existsSync(path) && fs.statSync(path).isDirectory()) {
+    try {
+      process.chdir(path); // Change current working directory
+      console.log(`Changed directory to: ${process.cwd()}`);
+    } catch (err) {
+      console.error(`cd: ${path}: ${(err as Error).message}`);
+    }
+  } else {
+    console.error(`cd: ${path}: No such file or directory`);
+  }
+}
+
 function prompt() {
   rl.question("$ ", (answer: string) => {
     answer = answer.trim();
@@ -58,7 +73,7 @@ function prompt() {
     const [command, ...args] = answer.split(" ");
 
     if (command === "type") {
-      const builtInCommands = ["echo", "exit", "type", "pwd"];
+      const builtInCommands = ["echo", "exit", "type", "pwd", "cd"];
       const [first] = args;
 
       if (!first) {
@@ -79,6 +94,12 @@ function prompt() {
       }
     } else if (command === "echo") {
       console.log(args.join(" "));
+    } else if (command === "cd") {
+      if (args.length === 0) {
+        console.log("cd: missing operand");
+      } else {
+        cd(args[0]);
+      }
     } else {
       const executableInfo = findExecutable(command);
 

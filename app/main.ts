@@ -49,6 +49,12 @@ function prompt() {
       return;
     }
 
+    if (answer === "pwd") {
+      console.log(process.cwd());
+      prompt();
+      return;
+    }
+
     const [command, ...args] = answer.split(" ");
 
     if (command === "type") {

@@ -64,8 +64,9 @@ function prompt() {
         console.log(`${first} is a shell builtin`);
       } else {
         try {
-          const result = findExecutable(first);
-          console.log(`${first} is here ${JSON.stringify(result?.location)}`);
+          console.log(
+            `${first} is here ${JSON.stringify(findExecutable(first)?.location)}`,
+          );
         } catch {
           console.log(`${first}: not found`);
         }

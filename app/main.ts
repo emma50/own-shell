@@ -1,5 +1,5 @@
 import { createInterface } from "readline";
-import { execSync } from "child_process";
+import { exec, execSync } from "child_process";
 
 const rl = createInterface({
   input: process.stdin,
@@ -24,7 +24,7 @@ function findExecutable(executable: string) {
       command: getFileName(output),
     };
   } catch {
-    console.log(`${executable}: not found`);
+    return undefined;
   }
 }
 
@@ -65,17 +65,30 @@ function prompt() {
       } else {
         try {
           console.log(
-            `${first} is here ${JSON.stringify(findExecutable(first)?.location)}`,
+            `${first} is ${JSON.stringify(findExecutable(first)?.location)}`,
           );
         } catch {
           console.log(`${first}: not found`);
         }
       }
-    } else if (command === findExecutable(command)?.command) {
-      console.log(`${command} is here ${findExecutable(command)?.location}`);
+    } else if (command === "echo") {
+      console.log(args.join(" "));
     } else {
-      // ✅ Default case for unknown commands
-      console.log(`${command}: command not found`);
+      const executableInfo = findExecutable(command);
+
+      if (executableInfo && executableInfo.isExecutable) {
+        const fullCommand =
+          args.length > 0 ? `${command} ${args.join(" ")}` : command;
+
+        exec(fullCommand, (error, stdout, stderr) => {
+          if (stdout) process.stdout.write(stdout);
+          if (stderr) process.stderr.write(stderr);
+          prompt();
+        });
+        return;
+      } else {
+        console.log(`${command}: command not found`);
+      }
     }
     // Repeat the prompt
     prompt();

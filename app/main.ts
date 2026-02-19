@@ -39,14 +39,9 @@ function getFileName(filePath: string) {
 function cd(path: string) {
   // Check if the path exists and is a directory
   if (fs.existsSync(path) && fs.statSync(path).isDirectory()) {
-    try {
-      process.chdir(path); // Change current working directory
-      console.log(`Changed directory to: ${process.cwd()}`);
-    } catch (err) {
-      console.error(`cd: ${path}: ${(err as Error).message}`);
-    }
+    process.chdir(path); // Change current working directory
   } else {
-    console.error(`cd: ${path}: No such file or directory`);
+    console.log(`cd: ${path}: No such file or directory`);
   }
 }
 

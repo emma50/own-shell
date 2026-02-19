@@ -37,6 +37,14 @@ function getFileName(filePath: string) {
 }
 
 function cd(path: string) {
+  // Get the HOME environment variable
+  const homeDir = process.env.HOME || process.env.USERPROFILE; // USERPROFILE for Windows fallback
+
+  // If path is just "~", change to home directory
+  if (path === "~") {
+    path = homeDir as string;
+  }
+
   // Check if the path exists and is a directory
   if (fs.existsSync(path) && fs.statSync(path).isDirectory()) {
     process.chdir(path); // Change current working directory

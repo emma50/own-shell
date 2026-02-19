@@ -1,127 +1,114 @@
 import { createInterface } from "readline";
 import { exec, execSync } from "child_process";
 import fs from "fs";
+import path from "path";
 
 const rl = createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
+// ---------- Utility Functions ----------
+
+function getFileName(filePath: string): string {
+  const baseName = path.basename(filePath);
+  return baseName.replace(/\.[^/.]+$/, "");
+}
+
 function findExecutable(executable: string) {
-  // On Windows, the `where` command is used to find the location of executables, while on Unix-like systems, the `which` command serves the same purpose.
   const isWindows = process.platform === "win32";
+  const command = isWindows ? `where ${executable}` : `which ${executable}`;
 
   try {
-    const result = execSync(
-      isWindows ? `where ${executable}` : `which ${executable}`,
-      { stdio: "pipe" },
-    );
-
-    const output = result.toString().trim();
-
+    const result = execSync(command, { stdio: "pipe" }).toString().trim();
     return {
-      location: output,
-      isExecutable: !!getFileName(output),
-      command: getFileName(output),
+      location: result,
+      isExecutable: Boolean(getFileName(result)),
+      command: getFileName(result),
     };
   } catch {
     return undefined;
   }
 }
 
-function getFileName(filePath: string) {
-  // Get the last part of the path (cat.exe)
-  const baseName = filePath.split("\\").pop();
-  // Remove the extension (.exe)
-  return (baseName as string).replace(/\.[^/.]+$/, "");
-}
+function changeDirectory(targetPath: string) {
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
 
-function cd(path: string) {
-  // Get the HOME environment variable
-  const homeDir = process.env.HOME || process.env.USERPROFILE; // USERPROFILE for Windows fallback
+  const resolvedPath = targetPath === "~" ? homeDir : targetPath;
 
-  // If path is just "~", change to home directory
-  if (path === "~") {
-    path = homeDir as string;
+  if (!resolvedPath) {
+    console.error("cd: HOME directory not set");
+    return;
   }
 
-  // Check if the path exists and is a directory
-  if (fs.existsSync(path) && fs.statSync(path).isDirectory()) {
-    process.chdir(path); // Change current working directory
+  if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isDirectory()) {
+    process.chdir(resolvedPath);
   } else {
-    console.log(`cd: ${path}: No such file or directory`);
+    console.error(`cd: ${resolvedPath}: No such file or directory`);
+  }
+}
+
+// ---------- Command Handlers ----------
+
+const builtInCommands: Record<string, (args: string[]) => void> = {
+  echo: (args) => console.log(args.join(" ")),
+  pwd: () => console.log(process.cwd()),
+  cd: (args) => {
+    if (args.length === 0) {
+      console.error("cd: missing operand");
+    } else {
+      changeDirectory(args[0]);
+    }
+  },
+  type: (args) => {
+    const [first] = args;
+    if (!first) return;
+
+    if (Object.keys(builtInCommands).includes(first)) {
+      console.log(`${first} is a shell builtin`);
+    } else {
+      const executableInfo = findExecutable(first);
+      if (executableInfo?.location) {
+        console.log(`${first} is ${executableInfo.location}`);
+      } else {
+        console.log(`${first}: not found`);
+      }
+    }
+  },
+  exit: () => rl.close(),
+};
+
+// ---------- Shell Loop ----------
+
+function runCommand(input: string) {
+  const [command, ...args] = input.trim().split(/\s+/);
+
+  if (!command) return;
+
+  if (builtInCommands[command]) {
+    builtInCommands[command](args);
+  } else {
+    const executableInfo = findExecutable(command);
+    if (executableInfo?.isExecutable) {
+      const fullCommand =
+        args.length > 0 ? `${command} ${args.join(" ")}` : command;
+      exec(fullCommand, (error, stdout, stderr) => {
+        if (stdout) process.stdout.write(stdout);
+        if (stderr) process.stderr.write(stderr);
+        if (error) console.error(`Error: ${error.message}`);
+        prompt();
+      });
+      return;
+    } else {
+      console.error(`${command}: command not found`);
+    }
   }
 }
 
 function prompt() {
-  rl.question("$ ", (answer: string) => {
-    answer = answer.trim();
-
-    if (answer.length === 0) {
-      prompt();
-      return;
-    }
-    // // Exit the terminal on "exit" command
-    if (answer === "exit") {
-      rl.close();
-      return;
-    }
-
-    if (answer === "pwd") {
-      console.log(process.cwd());
-      prompt();
-      return;
-    }
-
-    const [command, ...args] = answer.split(" ");
-
-    if (command === "type") {
-      const builtInCommands = ["echo", "exit", "type", "pwd", "cd"];
-      const [first] = args;
-
-      if (!first) {
-        prompt();
-        return;
-      }
-
-      if (builtInCommands.includes(first)) {
-        console.log(`${first} is a shell builtin`);
-      } else {
-        const executableInfo = findExecutable(first);
-
-        if (executableInfo && executableInfo.location) {
-          console.log(`${first} is ${executableInfo.location}`);
-        } else {
-          console.log(`${first}: not found`);
-        }
-      }
-    } else if (command === "echo") {
-      console.log(args.join(" "));
-    } else if (command === "cd") {
-      if (args.length === 0) {
-        console.log("cd: missing operand");
-      } else {
-        cd(args[0]);
-      }
-    } else {
-      const executableInfo = findExecutable(command);
-
-      if (executableInfo && executableInfo.isExecutable) {
-        const fullCommand =
-          args.length > 0 ? `${command} ${args.join(" ")}` : command;
-
-        exec(fullCommand, (error, stdout, stderr) => {
-          if (stdout) process.stdout.write(stdout);
-          if (stderr) process.stderr.write(stderr);
-          prompt();
-        });
-        return;
-      } else {
-        console.log(`${command}: command not found`);
-      }
-    }
-    // Repeat the prompt
-    prompt();
+  rl.question("$ ", (answer) => {
+    runCommand(answer);
+    if (answer.trim() !== "exit") prompt();
   });
 }
 

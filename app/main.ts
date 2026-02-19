@@ -48,6 +48,44 @@ function changeDirectory(targetPath: string) {
   }
 }
 
+function parseInput(input: string): string[] {
+  const tokens: string[] = [];
+  let current = "";
+  let inSingleQuote = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+
+    if (char === "'" && !inSingleQuote) {
+      // Enter single-quote mode
+      inSingleQuote = true;
+      continue;
+    }
+
+    if (char === "'" && inSingleQuote) {
+      // Exit single-quote mode
+      inSingleQuote = false;
+      continue;
+    }
+
+    if (!inSingleQuote && /\s/.test(char)) {
+      // Whitespace ends a token (only outside quotes)
+      if (current.length > 0) {
+        tokens.push(current);
+        current = "";
+      }
+    } else {
+      current += char;
+    }
+  }
+
+  if (current.length > 0) {
+    tokens.push(current);
+  }
+
+  return tokens;
+}
+
 // ---------- Command Handlers ----------
 
 const builtInCommands: Record<string, (args: string[]) => void> = {
@@ -81,7 +119,7 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
 // ---------- Shell Loop ----------
 
 function runCommand(input: string) {
-  const [command, ...args] = input.trim().split(/\s+/);
+  const [command, ...args] = parseInput(input.trim());
 
   if (!command) return;
 

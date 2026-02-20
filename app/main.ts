@@ -133,7 +133,6 @@ function runCommand(input: string) {
       execFile(command, args, (error, stdout, stderr) => {
         if (stdout) process.stdout.write(stdout);
         if (stderr) process.stderr.write(stderr);
-        if (error) console.error(`Error: ${error.message}`);
         prompt();
       });
       return;
@@ -147,7 +146,6 @@ function runCommand(input: string) {
 function prompt() {
   rl.question("$ ", (answer) => {
     runCommand(answer);
-    if (answer.trim() !== "exit") prompt();
   });
 }
 

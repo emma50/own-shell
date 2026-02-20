@@ -65,6 +65,9 @@ function parseInput(input: string): string[] {
     if (char === "'" && inSingleQuote) {
       // Exit single-quote mode
       inSingleQuote = false;
+      tokens.push(current); // push entire quoted string as one token
+      current = "";
+
       continue;
     }
 

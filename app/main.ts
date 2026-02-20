@@ -125,6 +125,7 @@ function runCommand(input: string) {
 
   if (builtInCommands[command]) {
     builtInCommands[command](args);
+    if (command !== "exit") prompt(); // show prompt again unless exiting
   } else {
     const executableInfo = findExecutable(command);
     if (executableInfo?.isExecutable) {
@@ -138,6 +139,7 @@ function runCommand(input: string) {
       return;
     } else {
       console.error(`${command}: command not found`);
+      prompt();
     }
   }
 }

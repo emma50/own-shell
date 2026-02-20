@@ -1,5 +1,5 @@
 import { createInterface } from "readline";
-import { exec, execSync } from "child_process";
+import { execSync, execFile } from "child_process";
 import fs from "fs";
 import path from "path";
 
@@ -128,9 +128,8 @@ function runCommand(input: string) {
   } else {
     const executableInfo = findExecutable(command);
     if (executableInfo?.isExecutable) {
-      const fullCommand =
-        args.length > 0 ? `${command} ${args.join(" ")}` : command;
-      exec(fullCommand, (error, stdout, stderr) => {
+      // Use execFile instead of exec
+      execFile(command, args, (error, stdout, stderr) => {
         if (stdout) process.stdout.write(stdout);
         if (stderr) process.stderr.write(stderr);
         if (error) console.error(`Error: ${error.message}`);

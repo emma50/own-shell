@@ -69,22 +69,41 @@ function parseInput(input: string): string[] {
       continue;
     }
 
+    // ---- BACKSLASH ----
+    if (char === "\\") {
+      // Inside single quotes → literal
+      if (inSingleQuote) {
+        current += char;
+        continue;
+      }
+
+      // Inside double quotes → only escape specific chars
+      if (inDoubleQuote) {
+        const next = input[i + 1];
+        if (next && ['"', "\\", "$", "`"].includes(next)) {
+          current += next;
+          i++;
+        } else {
+          current += char;
+        }
+        continue;
+      }
+
+      // Outside quotes → escape next char
+      const next = input[i + 1];
+      if (next) {
+        current += next;
+        i++;
+      }
+      continue;
+    }
+
     // If whitespace and NOT inside quotes → split token
     if (!inSingleQuote && !inDoubleQuote && /\s/.test(char)) {
       // Whitespace ends a token (only outside quotes)
       if (current.length > 0) {
         tokens.push(current);
         current = "";
-      }
-      continue;
-    }
-
-    // Handle backslashes (escape sequences)
-    if ((char === "\\" && !inSingleQuote) || (char === "\\" && inDoubleQuote)) {
-      // If backslash, skip next character (escape sequence)
-      i++;
-      if (i < input.length) {
-        current += input[i];
       }
       continue;
     }

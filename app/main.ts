@@ -86,7 +86,6 @@ function parseInput(input: string): string[] {
       if (i < input.length) {
         current += input[i];
       }
-
       continue;
     }
 

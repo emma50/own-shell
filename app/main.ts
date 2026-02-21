@@ -78,6 +78,17 @@ function parseInput(input: string): string[] {
       }
       continue;
     }
+
+    if (char === "\\") {
+      // If backslash, skip next character (escape sequence)
+      i++;
+      if (i < input.length) {
+        current += input[i];
+      }
+
+      continue;
+    }
+
     // Otherwise add character to current token
     current += char;
   }

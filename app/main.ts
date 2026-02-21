@@ -79,7 +79,8 @@ function parseInput(input: string): string[] {
       continue;
     }
 
-    if (char === "\\") {
+    // Handle backslashes (escape sequences)
+    if ((char === "\\" && !inSingleQuote) || (char === "\\" && inDoubleQuote)) {
       // If backslash, skip next character (escape sequence)
       i++;
       if (i < input.length) {

@@ -52,31 +52,34 @@ function parseInput(input: string): string[] {
   const tokens: string[] = [];
   let current = "";
   let inSingleQuote = false;
+  let inDoubleQuote = false;
 
   for (let i = 0; i < input.length; i++) {
     const char = input[i];
 
-    if (char === "'" && !inSingleQuote) {
-      // Enter single-quote mode
-      inSingleQuote = true;
+    // --- Single quotes --- Toggle single quotes (only if not inside double quotes)
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
       continue;
     }
 
-    if (char === "'" && inSingleQuote) {
-      // Exit single-quote mode
-      inSingleQuote = false;
-      continue; // don't push yet, allow concatenation
+    // --- Double quotes --- Toggle double quotes (only if not inside single quotes)
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
     }
 
-    if (!inSingleQuote && /\s/.test(char)) {
+    // If whitespace and NOT inside quotes → split token
+    if (!inSingleQuote && !inDoubleQuote && /\s/.test(char)) {
       // Whitespace ends a token (only outside quotes)
       if (current.length > 0) {
         tokens.push(current);
         current = "";
       }
-    } else {
-      current += char;
+      continue;
     }
+    // Otherwise add character to current token
+    current += char;
   }
 
   if (current.length > 0) {

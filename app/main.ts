@@ -1,5 +1,5 @@
 import { createInterface } from "readline";
-import { execSync, execFile } from "child_process";
+import { execSync, execFile, execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
@@ -20,7 +20,12 @@ function findExecutable(executable: string) {
   const command = isWindows ? `where ${executable}` : `which ${executable}`;
 
   try {
-    const result = execSync(command, { stdio: "pipe" }).toString().trim();
+    const result = execFileSync(command, [executable], {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+
     return {
       location: result,
       isExecutable: Boolean(getFileName(result)),

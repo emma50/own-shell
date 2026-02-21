@@ -157,27 +157,83 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
 // ---------- Shell Loop ----------
 
 function runCommand(input: string) {
-  const [command, ...args] = parseInput(input.trim());
+  const tokens = parseInput(input.trim());
 
-  if (!command) return;
+  if (tokens.length === 0) return;
 
-  if (builtInCommands[command]) {
-    builtInCommands[command](args);
-    if (command !== "exit") prompt(); // show prompt again unless exiting
-  } else {
-    const executableInfo = findExecutable(command);
-    if (executableInfo?.isExecutable) {
-      // Use execFile instead of exec
-      execFile(command, args, (error, stdout, stderr) => {
-        if (stdout) process.stdout.write(stdout);
-        if (stderr) process.stderr.write(stderr);
-        prompt();
-      });
-      return;
-    } else {
-      console.error(`${command}: command not found`);
+  // --- Detect ">" ---
+  const redirectOperatorIndex = tokens.indexOf(">");
+
+  let outputFile: string | null = null;
+
+  if (redirectOperatorIndex !== -1) {
+    if (redirectOperatorIndex === tokens.length - 1) {
+      console.error("syntax error: no file specified");
       prompt();
+      return;
     }
+
+    outputFile = tokens[redirectOperatorIndex + 1];
+
+    // Remove ">" and filename from tokens
+    tokens.splice(redirectOperatorIndex, 2);
+  }
+
+  const [command, ...args] = tokens;
+
+  if (!command) {
+    prompt();
+    return;
+  }
+
+  // BUILT-IN COMMANDS
+  if (builtInCommands[command]) {
+    if (outputFile) {
+      // Capture output manually
+      const originalLog = console.log;
+      const writeStream = fs.createWriteStream(outputFile, { flags: "w" });
+
+      console.log = (...data: any[]) => {
+        writeStream.write(data.join(" ") + "\n");
+      };
+
+      builtInCommands[command](args);
+
+      console.log = originalLog;
+      writeStream.end();
+    } else {
+      builtInCommands[command](args);
+    }
+
+    if (command !== "exit") prompt();
+
+    return;
+  }
+
+  // ---- EXTERNAL COMMAND ----
+  const executableInfo = findExecutable(command);
+
+  if (!executableInfo) {
+    console.error(`${command}: command not found`);
+    prompt();
+    return;
+  }
+
+  const child = execFile(command, args, (error) => {
+    if (error && error.code !== 0) {
+      // Let stderr handle it
+    }
+    prompt();
+  });
+
+  if (outputFile) {
+    const writeStream = fs.createWriteStream(outputFile, { flags: "w" });
+
+    child.stdout?.pipe(writeStream);
+    child.stderr?.pipe(process.stderr);
+  } else {
+    child.stdout?.pipe(process.stdout);
+    child.stderr?.pipe(process.stderr);
   }
 }
 

@@ -165,10 +165,20 @@ function runCommand(input: string) {
   let redirectOperatorIndex = -1;
   let redirectOperator = null;
 
+  // --- Detect "2>" ---
+  let redirectErrorOperatorIndex = -1;
+  let redirectErrorOperator = null;
+
   for (let i = 0; i < tokens.length; i++) {
     if (tokens[i] === ">" || tokens[i] === "1>") {
       redirectOperatorIndex = i;
       redirectOperator = tokens[i];
+      break;
+    }
+
+    if (tokens[i] === "2>") {
+      redirectErrorOperatorIndex = i;
+      redirectErrorOperator = tokens[i];
       break;
     }
   }
@@ -186,6 +196,19 @@ function runCommand(input: string) {
 
     // Remove ">" and filename from tokens
     tokens.splice(redirectOperatorIndex, 2);
+  }
+
+  if (redirectErrorOperatorIndex !== -1) {
+    if (redirectErrorOperatorIndex === tokens.length - 1) {
+      console.error("syntax error: no file specified");
+      prompt();
+      return;
+    }
+
+    outputFile = tokens[redirectErrorOperatorIndex + 1];
+
+    // Remove "2>" and filename from tokens
+    tokens.splice(redirectErrorOperatorIndex, 2);
   }
 
   const [command, ...args] = tokens;
@@ -239,7 +262,7 @@ function runCommand(input: string) {
     const writeStream = fs.createWriteStream(outputFile, { flags: "w" });
 
     child.stdout?.pipe(writeStream);
-    child.stderr?.pipe(process.stderr);
+    child.stderr?.pipe(writeStream);
   } else {
     child.stdout?.pipe(process.stdout);
     child.stderr?.pipe(process.stderr);

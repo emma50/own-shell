@@ -162,7 +162,16 @@ function runCommand(input: string) {
   if (tokens.length === 0) return;
 
   // --- Detect ">" ---
-  const redirectOperatorIndex = tokens.indexOf(">");
+  let redirectOperatorIndex = -1;
+  let redirectOperator = null;
+
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i] === ">" || tokens[i] === "1>") {
+      redirectOperatorIndex = i;
+      redirectOperator = tokens[i];
+      break;
+    }
+  }
 
   let outputFile: string | null = null;
 

@@ -154,61 +154,62 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
 };
 
+// Redirection handling: supports ">", "1>", ">>", and "2>"
+type Redirection = {
+  fd: 1 | 2;
+  file: string;
+  append: boolean;
+};
+
+// Redirection Detection Logic:
+// Extracts redirection operators and their targets from the token list
+function extractRedirection(tokens: string[]): {
+  tokens: string[];
+  redirection: Redirection | null;
+} {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+
+    const match = token.match(/^([12]?)(>>|>)$/);
+    if (!match) continue;
+
+    if (i === tokens.length - 1) {
+      throw new Error("syntax error: no file specified");
+    }
+
+    const fd = match[1] === "2" ? 2 : 1; // default stdout
+    const append = match[2] === ">>";
+    const file = tokens[i + 1];
+
+    const newTokens = [...tokens];
+    newTokens.splice(i, 2);
+
+    return {
+      tokens: newTokens,
+      redirection: { fd, file, append },
+    };
+  }
+
+  return { tokens, redirection: null };
+}
+
 // ---------- Shell Loop ----------
 
 function runCommand(input: string) {
-  const tokens = parseInput(input.trim());
+  let tokens = parseInput(input.trim());
 
   if (tokens.length === 0) return;
 
-  // --- Detect ">" ---
-  let redirectOperatorIndex = -1;
-  let redirectOperator = null;
+  let redirection: Redirection | null = null;
 
-  // --- Detect "2>" ---
-  let redirectErrorOperatorIndex = -1;
-  let redirectErrorOperator = null;
-
-  for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i] === ">" || tokens[i] === "1>") {
-      redirectOperatorIndex = i;
-      redirectOperator = tokens[i];
-      break;
-    }
-
-    if (tokens[i] === "2>") {
-      redirectErrorOperatorIndex = i;
-      redirectErrorOperator = tokens[i];
-      break;
-    }
-  }
-
-  let outputFile: string | null = null;
-
-  if (redirectOperatorIndex !== -1) {
-    if (redirectOperatorIndex === tokens.length - 1) {
-      console.error("syntax error: no file specified");
-      prompt();
-      return;
-    }
-
-    outputFile = tokens[redirectOperatorIndex + 1];
-
-    // Remove ">" and filename from tokens
-    tokens.splice(redirectOperatorIndex, 2);
-  }
-
-  if (redirectErrorOperatorIndex !== -1) {
-    if (redirectErrorOperatorIndex === tokens.length - 1) {
-      console.error("syntax error: no file specified");
-      prompt();
-      return;
-    }
-
-    outputFile = tokens[redirectErrorOperatorIndex + 1];
-
-    // Remove "2>" and filename from tokens
-    tokens.splice(redirectErrorOperatorIndex, 2);
+  try {
+    const result = extractRedirection(tokens);
+    tokens = result.tokens;
+    redirection = result.redirection;
+  } catch (err: any) {
+    console.error(err.message);
+    prompt();
+    return;
   }
 
   const [command, ...args] = tokens;
@@ -220,25 +221,30 @@ function runCommand(input: string) {
 
   // BUILT-IN COMMANDS
   if (builtInCommands[command]) {
-    if (outputFile) {
-      // Capture output manually
-      const originalLog = console.log;
-      const writeStream = fs.createWriteStream(outputFile, { flags: "w" });
+    if (redirection) {
+      const stream = fs.createWriteStream(redirection.file, {
+        flags: redirection.append ? "a" : "w",
+      });
 
-      console.log = (...data: any[]) => {
-        writeStream.write(data.join(" ") + "\n");
-      };
+      const originalLog = console.log;
+      const originalError = console.error;
+
+      if (redirection.fd === 1) {
+        console.log = (...data: any[]) => stream.write(data.join(" ") + "\n");
+      } else {
+        console.error = (...data: any[]) => stream.write(data.join(" ") + "\n");
+      }
 
       builtInCommands[command](args);
 
       console.log = originalLog;
-      writeStream.end();
+      console.error = originalError;
+      stream.end();
     } else {
       builtInCommands[command](args);
     }
 
     if (command !== "exit") prompt();
-
     return;
   }
 
@@ -258,14 +264,27 @@ function runCommand(input: string) {
     prompt();
   });
 
-  if (outputFile) {
-    const writeStream = fs.createWriteStream(outputFile, { flags: "w" });
+  if (redirection) {
+    const stream = fs.createWriteStream(redirection.file, {
+      flags: redirection.append ? "a" : "w",
+    });
 
-    child.stdout?.pipe(writeStream);
-    child.stderr?.pipe(writeStream);
+    if (redirection.fd === 1) {
+      child.stdout?.pipe(stream);
+      child.stderr?.pipe(process.stderr);
+    } else {
+      child.stderr?.pipe(stream);
+      child.stdout?.pipe(process.stdout);
+    }
+
+    child.on("close", () => {
+      stream.end();
+      prompt();
+    });
   } else {
     child.stdout?.pipe(process.stdout);
     child.stderr?.pipe(process.stderr);
+    child.on("close", () => prompt());
   }
 }
 

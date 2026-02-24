@@ -10,7 +10,7 @@ function completer(line: string) {
   if (tokens.length === 1) {
     // First token → command
     const hits = builtIns.filter((cmd) => cmd.startsWith(tokens[0]));
-    return [hits.length ? hits : builtIns, tokens[0]];
+    return [hits.length ? `${hits} ` : `${builtIns} `, tokens[0]];
   } else if (tokens[0] === "echo") {
     // For now, no argument suggestions, just return empty
     return [[], line];

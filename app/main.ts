@@ -5,15 +5,23 @@ import path from "path";
 
 const builtins = ["echo", "exit"];
 
+function completer(line: string) {
+  const matches = builtins.filter((cmd) => cmd.startsWith(line));
+
+  if (matches.length > 0) {
+    // Valid matches → add a space at the end
+    return [matches.map((cmd) => cmd + " "), line];
+  } else {
+    // No matches → ring the bell
+    process.stdout.write("\x07"); // bell character
+    return [[], line]; // leave input unchanged
+  }
+}
+
 const rl = createInterface({
   input: process.stdin,
   output: process.stdout,
-  completer: (line: string) => {
-    const matches = builtins
-      .filter((cmd) => cmd.startsWith(line))
-      .map((cmd) => cmd + " "); // add trailing space
-    return [matches.length ? matches : builtins, line];
-  }, // Tab completion enabled here
+  completer,
 });
 
 // ---------- Utility Functions ----------

@@ -3,9 +3,25 @@ import { execFile, execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
+const builtIns = ["echo", "exit"];
+
+function completer(line: string) {
+  const tokens = line.split(/\s+/);
+  if (tokens.length === 1) {
+    // First token → command
+    const hits = builtIns.filter((cmd) => cmd.startsWith(tokens[0]));
+    return [hits.length ? hits : builtIns, tokens[0]];
+  } else if (tokens[0] === "echo") {
+    // For now, no argument suggestions, just return empty
+    return [[], line];
+  }
+  return [[], line];
+}
+
 const rl = createInterface({
   input: process.stdin,
   output: process.stdout,
+  completer: completer, // Tab completion enabled here
 });
 
 // ---------- Utility Functions ----------
@@ -155,6 +171,7 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
 };
 
 // Redirection handling: supports ">", "1>", ">>", and "2>"
+// Describe which file descriptor (1 = stdout, 2 = stderr), file path, and whether to append.
 type Redirection = {
   fd: 1 | 2;
   file: string;

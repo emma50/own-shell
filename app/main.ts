@@ -3,25 +3,17 @@ import { execFile, execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
-const builtIns = ["echo", "exit"];
-
-function completer(line: string) {
-  const tokens = line.split(/\s+/);
-  if (tokens.length === 1) {
-    // First token → command
-    const hits = builtIns.filter((cmd) => cmd.startsWith(tokens[0]));
-    return [hits.length ? `${hits} ` : `${builtIns} `, tokens[0]];
-  } else if (tokens[0] === "echo") {
-    // For now, no argument suggestions, just return empty
-    return [[], line];
-  }
-  return [[], line];
-}
+const builtins = ["echo", "exit"];
 
 const rl = createInterface({
   input: process.stdin,
   output: process.stdout,
-  completer: completer, // Tab completion enabled here
+  completer: (line: string) => {
+    const matches = builtins
+      .filter((cmd) => cmd.startsWith(line))
+      .map((cmd) => cmd + " "); // add trailing space
+    return [matches.length ? matches : builtins, line];
+  }, // Tab completion enabled here
 });
 
 // ---------- Utility Functions ----------

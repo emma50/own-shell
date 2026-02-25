@@ -79,7 +79,7 @@ function completer(line: string): [string[], string] {
     return a < b ? -1 : a > b ? 1 : 0;
   };
   console.log();
-  console.log(matches.sort(compareFn).join("  "));
+  console.log(matches.sort(compareFn).join("  ") + " ");
   process.stdout.write(`$ ${currentWord}`);
 
   tabPressCount = 0;

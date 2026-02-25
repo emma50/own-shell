@@ -30,29 +30,32 @@ function getExecutablesFromPath(): string[] {
   return Array.from(executables);
 }
 
-function completer(line: string) {
-  const trimmed = line.trim();
+function completer(line: string): [string[], string] {
+  const words = line.split(" ");
+  const currentWord = words[words.length - 1];
 
-  // Only autocomplete first word (command)
-  if (trimmed.includes(" ")) {
+  // Only complete the first word (command)
+  if (words.length > 1) {
     tabPressCount = 0;
-    return [[], line];
+    return [[], currentWord];
   }
 
   const builtins = Object.keys(builtInCommands);
   const executables = getExecutablesFromPath();
+
   const allCommands = [...builtins, ...executables];
+
   const matches = allCommands.filter((cmd) => cmd.startsWith(line));
 
   if (matches.length === 0) {
     process.stdout.write("\x07"); // always bell if no matches
     tabPressCount = 0;
-    return [[], line];
+    return [[], currentWord];
   }
 
   // If prefix changed, reset counter
-  if (trimmed !== lastCompletionPrefix) {
-    lastCompletionPrefix = trimmed;
+  if (currentWord !== lastCompletionPrefix) {
+    lastCompletionPrefix = currentWord;
     tabPressCount = 0;
   }
 
@@ -61,14 +64,14 @@ function completer(line: string) {
   // SINGLE MATCH → autocomplete immediately
   if (matches.length === 1) {
     tabPressCount = 0;
-    return [[matches[0] + " "], trimmed];
+    return [[matches[0] + " "], currentWord];
   }
 
   // MULTIPLE MATCHES
   if (tabPressCount === 1) {
     // First TAB → bell only
     process.stdout.write("\x07");
-    return [[], line];
+    return [[], currentWord];
   }
 
   // Second TAB → print matches
@@ -77,10 +80,10 @@ function completer(line: string) {
   };
   console.log();
   console.log(matches.sort(compareFn).join("  "));
-  process.stdout.write(`$ ${trimmed}`);
+  process.stdout.write(`$ ${currentWord}`);
 
   tabPressCount = 0;
-  return [[], trimmed];
+  return [[], currentWord];
 }
 
 const rl = createInterface({

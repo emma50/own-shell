@@ -3,6 +3,9 @@ import { execFile, execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
+let lastCompletionPrefix = "";
+let tabPressCount = 0;
+
 function getExecutablesFromPath(): string[] {
   const pathEnv = process.env.PATH;
   if (!pathEnv) return [];
@@ -32,6 +35,7 @@ function completer(line: string) {
 
   // Only autocomplete first word (command)
   if (trimmed.includes(" ")) {
+    tabPressCount = 0;
     return [[], line];
   }
 
@@ -40,14 +44,40 @@ function completer(line: string) {
   const allCommands = [...builtins, ...executables];
   const matches = allCommands.filter((cmd) => cmd.startsWith(line));
 
-  if (matches.length > 0) {
-    // Valid matches → add a space at the end
-    return [matches.map((cmd) => cmd + " "), line];
-  } else {
-    // No matches → ring the bell
-    process.stdout.write("\x07"); // bell character
-    return [[], line]; // leave input unchanged
+  if (matches.length === 0) {
+    process.stdout.write("\x07"); // always bell if no matches
+    tabPressCount = 0;
+    return [[], line];
   }
+
+  // If prefix changed, reset counter
+  if (trimmed !== lastCompletionPrefix) {
+    lastCompletionPrefix = trimmed;
+    tabPressCount = 0;
+  }
+
+  tabPressCount++;
+
+  // SINGLE MATCH → autocomplete immediately
+  if (matches.length === 1) {
+    tabPressCount = 0;
+    return [[matches[0] + " "], trimmed];
+  }
+
+  // MULTIPLE MATCHES
+  if (tabPressCount === 1) {
+    // First TAB → bell only
+    process.stdout.write("\x07");
+    return [[], line];
+  }
+
+  // Second TAB → print matches
+  console.log();
+  console.log(matches.join("  "));
+  process.stdout.write(`$ ${trimmed}`);
+
+  tabPressCount = 0;
+  return [[], trimmed];
 }
 
 const rl = createInterface({

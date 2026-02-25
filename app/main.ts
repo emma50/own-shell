@@ -72,8 +72,11 @@ function completer(line: string) {
   }
 
   // Second TAB → print matches
+  const compareFn = (a: string, b: string) => {
+    return a < b ? -1 : a > b ? 1 : 0;
+  };
   console.log();
-  console.log(matches.join("  "));
+  console.log(matches.sort(compareFn).join("  "));
   process.stdout.write(`$ ${trimmed}`);
 
   tabPressCount = 0;

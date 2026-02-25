@@ -3,10 +3,42 @@ import { execFile, execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
-const builtins = ["echo", "exit"];
+function getExecutablesFromPath(): string[] {
+  const pathEnv = process.env.PATH;
+  if (!pathEnv) return [];
+
+  const dirs = pathEnv.split(path.delimiter);
+  const executables = new Set<string>();
+
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+
+    try {
+      const files = fs.readdirSync(dir);
+
+      for (const file of files) {
+        executables.add(file);
+      }
+    } catch {
+      // ignore directories we can't read
+    }
+  }
+
+  return Array.from(executables);
+}
 
 function completer(line: string) {
-  const matches = builtins.filter((cmd) => cmd.startsWith(line));
+  const trimmed = line.trim();
+
+  // Only autocomplete first word (command)
+  if (trimmed.includes(" ")) {
+    return [[], line];
+  }
+
+  const builtins = Object.keys(builtInCommands);
+  const executables = getExecutablesFromPath();
+  const allCommands = [...builtins, ...executables];
+  const matches = allCommands.filter((cmd) => cmd.startsWith(line));
 
   if (matches.length > 0) {
     // Valid matches → add a space at the end
@@ -29,27 +61,6 @@ const rl = createInterface({
 function getFileName(filePath: string): string {
   const baseName = path.basename(filePath);
   return baseName.replace(/\.[^/.]+$/, "");
-}
-
-function findExecutable(executable: string) {
-  const isWindows = process.platform === "win32";
-  const command = isWindows ? "where" : "which";
-
-  try {
-    const result = execFileSync(command, [executable], {
-      stdio: ["ignore", "pipe", "ignore"],
-    })
-      .toString()
-      .trim();
-
-    return {
-      location: result,
-      isExecutable: Boolean(getFileName(result)),
-      command: getFileName(result),
-    };
-  } catch {
-    return undefined;
-  }
 }
 
 function changeDirectory(targetPath: string) {
@@ -138,6 +149,27 @@ function parseInput(input: string): string[] {
   }
 
   return tokens;
+}
+
+function findExecutable(executable: string) {
+  const isWindows = process.platform === "win32";
+  const command = isWindows ? "where" : "which";
+
+  try {
+    const result = execFileSync(command, [executable], {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+
+    return {
+      location: result,
+      isExecutable: Boolean(getFileName(result)),
+      command: getFileName(result),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------- Command Handlers ----------

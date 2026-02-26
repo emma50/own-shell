@@ -66,21 +66,25 @@ function completer(line: string): [string[], string] {
   const executables = getExecutablesFromPath();
   const allCommands = [...builtins, ...executables].sort();
 
-  // Only complete the LAST token
-  const tokens = line.split(/\s+/);
-  const lastToken = tokens[tokens.length - 1]; // only last token
-  const matches = allCommands.filter((cmd) => cmd.startsWith(lastToken));
+  // If there is a space, we're completing arguments.
+  // If there is NO space, we're completing the command itself.
+  const isCompletingCommand = !line.includes(" ");
 
-  // Reset tab counter if lastToken changed
-  if (lastToken !== lastPrefix) {
+  const prefix = isCompletingCommand
+    ? line
+    : line.slice(line.lastIndexOf(" ") + 1); // only last token
+  const matches = allCommands.filter((cmd) => cmd.startsWith(prefix));
+
+  // Reset tab counter if prefix changed
+  if (prefix !== lastPrefix) {
     tabCount = 0;
-    lastPrefix = lastToken;
+    lastPrefix = prefix;
   }
 
   //  No matches -> ring bell and do nothing
   if (matches.length === 0) {
     process.stdout.write("\x07");
-    return [[], lastToken];
+    return [[], prefix];
   }
 
   // Single match -> replace last token, add trailing space
@@ -88,14 +92,14 @@ function completer(line: string): [string[], string] {
     tabCount = 0;
     lastPrefix = "";
     // The first array element is **what readline inserts**:
-    return [[matches[0] + " "], line];
+    return [[matches[0] + " "], prefix];
   }
 
   // Multiple matches → first TAB: bell, second TAB: show options
   tabCount++;
   if (tabCount === 1) {
     process.stdout.write("\x07");
-    return [[], lastToken];
+    return [[], prefix];
   }
 
   // Second TAB → print all matches, show prompt again
@@ -104,7 +108,7 @@ function completer(line: string): [string[], string] {
   console.log(`$ ${line}`);
   tabCount = 0;
 
-  return [[], lastToken];
+  return [[], prefix];
 }
 
 const rl = createInterface({

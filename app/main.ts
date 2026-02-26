@@ -66,12 +66,14 @@ function completer(line: string): [string[], string] {
   const executables = getExecutablesFromPath();
   const allCommands = [...builtins, ...executables].sort();
 
-  const matches = allCommands.filter((cmd) => cmd.startsWith(line));
+  const tokens = line.split(/\s+/);
+  const prefix = tokens[tokens.length - 1]; // only last token
+  const matches = allCommands.filter((cmd) => cmd.startsWith(prefix));
 
   // Reset tab counter if prefix changed
-  if (line !== lastPrefix) {
+  if (prefix !== lastPrefix) {
     tabCount = 0;
-    lastPrefix = line;
+    lastPrefix = prefix;
   }
 
   //  No matches
@@ -84,7 +86,8 @@ function completer(line: string): [string[], string] {
   if (matches.length === 1) {
     tabCount = 0;
     lastPrefix = "";
-    return [[matches[0] + " "], ""];
+    tokens[tokens.length - 1] = matches[0] + " "; // replace only last token
+    return [[tokens.join(" ")], tokens.join(" ")];
   }
 
   // Multiple matches
@@ -92,17 +95,17 @@ function completer(line: string): [string[], string] {
 
   if (tabCount === 1) {
     process.stdout.write("\x07");
-    return [[], ""];
+    return [[], line];
   }
 
-  // Second TAB
+  // Second TAB: show all options
   console.log();
   console.log(matches.join("  "));
   console.log(`$ ${line}`);
 
   tabCount = 0;
 
-  return [[], ""];
+  return [[], line];
 }
 
 const rl = createInterface({

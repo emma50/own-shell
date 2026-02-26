@@ -3,106 +3,125 @@ import { execFile, execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
-let lastCompletionPrefix = "";
-let tabPressCount = 0;
+// ============================================================
+// PATH EXECUTABLES
+// ============================================================
 
+/** Scans every directory in $PATH and returns a unique list of executable filenames. */
 function getExecutablesFromPath(): string[] {
-  const pathEnv = process.env.PATH;
-  if (!pathEnv) return [];
-
-  const dirs = pathEnv.split(path.delimiter);
+  const pathEnv = process.env.PATH || "";
   const executables = new Set<string>();
 
-  for (const dir of dirs) {
-    if (!fs.existsSync(dir)) continue;
-
+  for (const dir of pathEnv.split(path.delimiter)) {
     try {
-      const files = fs.readdirSync(dir);
-
-      for (const file of files) {
+      for (const file of fs.readdirSync(dir)) {
         executables.add(file);
       }
     } catch {
-      // ignore directories we can't read
+      // Skip directories that don't exist or can't be read
     }
   }
 
   return Array.from(executables);
 }
 
+// ============================================================
+// BUILT-IN COMMANDS
+// ============================================================
+
 const builtInCommands: Record<string, (args: string[]) => void> = {
   echo: (args) => console.log(args.join(" ")),
-  pwd: () => console.log(process.cwd()),
-  cd: (args) => {
-    if (args.length === 0) {
-      console.error("cd: missing operand");
-    } else {
-      changeDirectory(args[0]);
-    }
-  },
-  type: (args) => {
-    const [first] = args;
-    if (!first) return;
 
-    if (Object.keys(builtInCommands).includes(first)) {
-      console.log(`${first} is a shell builtin`);
+  pwd: () => console.log(process.cwd()),
+
+  cd: (args) => {
+    if (!args[0]) {
+      console.error("cd: missing operand");
+      return;
+    }
+    changeDirectory(args[0]);
+  },
+
+  type: (args) => {
+    const name = args[0];
+    if (!name) return;
+
+    if (name in builtInCommands) {
+      console.log(`${name} is a shell builtin`);
     } else {
-      const executableInfo = findExecutable(first);
-      if (executableInfo?.location) {
-        console.log(`${first} is ${executableInfo.location}`);
+      const found = findExecutable(name);
+      if (found) {
+        console.log(`${name} is ${found.location}`);
       } else {
-        console.log(`${first}: not found`);
+        console.log(`${name}: not found`);
       }
     }
   },
+
   exit: () => rl.close(),
 };
 
+// ============================================================
+// TAB COMPLETION
+// ============================================================
+
+// Track state between tab presses
 let lastPrefix = "";
 let tabCount = 0;
 
+/**
+ * readline calls this function every time the user presses TAB.
+ * It must return [completionList, prefix] where readline replaces
+ * the prefix in the line with the common prefix of completionList.
+ *
+ * Behaviour:
+ *  - No matches       → ring bell, do nothing
+ *  - Single match     → complete immediately with a trailing space
+ *  - Multiple matches → 1st TAB: bell, 2nd TAB: print all options
+ */
 function completer(line: string): [string[], string] {
-  const builtins = Object.keys(builtInCommands);
-  const executables = getExecutablesFromPath();
-  const allCommands = [...new Set([...builtins, ...executables])].sort();
+  // Build a deduplicated, sorted list of all known commands
+  const allCommands = [
+    ...new Set([...Object.keys(builtInCommands), ...getExecutablesFromPath()]),
+  ].sort();
 
-  // If there is a space, we're completing arguments.
-  // If there is NO space, we're completing the command itself.
-  const isCompletingCommand = !line.includes(" ");
+  // If the line has no space we're completing the command name.
+  // If it does have a space we're completing the last argument.
+  const prefix = line.includes(" ")
+    ? line.slice(line.lastIndexOf(" ") + 1)
+    : line;
 
-  const prefix = isCompletingCommand
-    ? line
-    : line.slice(line.lastIndexOf(" ") + 1); // only last token
   const matches = allCommands.filter((cmd) => cmd.startsWith(prefix));
 
-  // Reset tab counter if prefix changed
+  // Reset the tab-press counter whenever the user types a different prefix
   if (prefix !== lastPrefix) {
     tabCount = 0;
     lastPrefix = prefix;
   }
 
-  //  No matches -> ring bell and do nothing
+  // --- No matches: ring bell ---
   if (matches.length === 0) {
     process.stdout.write("\x07");
     return [[], prefix];
   }
 
-  // Single match -> replace last token, add trailing space
+  // --- Single match: complete it ---
   if (matches.length === 1) {
     tabCount = 0;
     lastPrefix = "";
-    // The first array element is **what readline inserts**:
-    return [[matches[0] + " "], prefix];
+    return [[matches[0] + " "], prefix]; // trailing space signals "done"
   }
 
-  // Multiple matches → first TAB: bell, second TAB: show options
+  // --- Multiple matches ---
   tabCount++;
+
   if (tabCount === 1) {
+    // First TAB → just ring the bell to hint there are options
     process.stdout.write("\x07");
     return [[], prefix];
   }
 
-  // Second TAB → print all matches, show prompt again
+  // Second TAB → show all options, then redraw the prompt + current input
   console.log();
   console.log(matches.join("  "));
   console.log(`$ ${line}`);
@@ -111,36 +130,48 @@ function completer(line: string): [string[], string] {
   return [[], prefix];
 }
 
+// ============================================================
+// READLINE INTERFACE
+// ============================================================
+
 const rl = createInterface({
   input: process.stdin,
   output: process.stdout,
   completer,
 });
 
-// ---------- Utility Functions ----------
+rl.setPrompt("$ ");
+rl.prompt();
 
-function getFileName(filePath: string): string {
-  const baseName = path.basename(filePath);
-  return baseName.replace(/\.[^/.]+$/, "");
-}
+rl.on("line", (line) => runCommand(line));
 
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+
+/** Resolves ~ to the home directory and changes the process working directory. */
 function changeDirectory(targetPath: string) {
-  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  const home = process.env.HOME || process.env.USERPROFILE;
 
-  const resolvedPath = targetPath === "~" ? homeDir : targetPath;
-
-  if (!resolvedPath) {
-    console.error("cd: HOME directory not set");
-    return;
+  if (targetPath === "~") {
+    if (!home) {
+      console.error("cd: HOME directory not set");
+      return;
+    }
+    targetPath = home;
   }
 
-  if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isDirectory()) {
-    process.chdir(resolvedPath);
+  if (fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory()) {
+    process.chdir(targetPath);
   } else {
-    console.error(`cd: ${resolvedPath}: No such file or directory`);
+    console.error(`cd: ${targetPath}: No such file or directory`);
   }
 }
 
+/**
+ * Tokenises a shell input string, respecting single quotes, double quotes,
+ * and backslash escaping — just like a real shell would.
+ */
 function parseInput(input: string): string[] {
   const tokens: string[] = [];
   let current = "";
@@ -150,28 +181,24 @@ function parseInput(input: string): string[] {
   for (let i = 0; i < input.length; i++) {
     const char = input[i];
 
-    // --- Single quotes --- Toggle single quotes (only if not inside double quotes)
+    // Toggle single-quote mode (ignored inside double quotes)
     if (char === "'" && !inDoubleQuote) {
       inSingleQuote = !inSingleQuote;
       continue;
     }
 
-    // --- Double quotes --- Toggle double quotes (only if not inside single quotes)
+    // Toggle double-quote mode (ignored inside single quotes)
     if (char === '"' && !inSingleQuote) {
       inDoubleQuote = !inDoubleQuote;
       continue;
     }
 
-    // ---- BACKSLASH ----
     if (char === "\\") {
-      // Inside single quotes → literal
       if (inSingleQuote) {
+        // Inside single quotes backslash is always literal
         current += char;
-        continue;
-      }
-
-      // Inside double quotes → only escape specific chars
-      if (inDoubleQuote) {
+      } else if (inDoubleQuote) {
+        // Inside double quotes only a handful of chars can be escaped
         const next = input[i + 1];
         if (next && ['"', "\\", "$", "`"].includes(next)) {
           current += next;
@@ -179,21 +206,19 @@ function parseInput(input: string): string[] {
         } else {
           current += char;
         }
-        continue;
-      }
-
-      // Outside quotes → escape next char
-      const next = input[i + 1];
-      if (next) {
-        current += next;
-        i++;
+      } else {
+        // Outside any quotes the next character is taken literally
+        const next = input[i + 1];
+        if (next) {
+          current += next;
+          i++;
+        }
       }
       continue;
     }
 
-    // If whitespace and NOT inside quotes → split token
+    // Unquoted whitespace → end of current token
     if (!inSingleQuote && !inDoubleQuote && /\s/.test(char)) {
-      // Whitespace ends a token (only outside quotes)
       if (current.length > 0) {
         tokens.push(current);
         current = "";
@@ -201,93 +226,89 @@ function parseInput(input: string): string[] {
       continue;
     }
 
-    // Otherwise add character to current token
     current += char;
   }
 
-  if (current.length > 0) {
-    tokens.push(current);
-  }
+  if (current.length > 0) tokens.push(current);
 
   return tokens;
 }
 
-function findExecutable(executable: string) {
-  const isWindows = process.platform === "win32";
-  const command = isWindows ? "where" : "which";
+/**
+ * Uses the system `which` (or `where` on Windows) to locate an executable.
+ * Returns undefined when the command is not found.
+ */
+function findExecutable(name: string): { location: string } | undefined {
+  const which = process.platform === "win32" ? "where" : "which";
 
   try {
-    const result = execFileSync(command, [executable], {
+    const location = execFileSync(which, [name], {
       stdio: ["ignore", "pipe", "ignore"],
     })
       .toString()
       .trim();
 
-    return {
-      location: result,
-      isExecutable: Boolean(getFileName(result)),
-      command: getFileName(result),
-    };
+    return { location };
   } catch {
     return undefined;
   }
 }
 
-// ---------- Command Handlers ----------
+// ============================================================
+// REDIRECTION
+// ============================================================
 
-// Redirection handling: supports ">", "1>", ">>", and "2>"
-// Describe which file descriptor (1 = stdout, 2 = stderr), file path, and whether to append.
 type Redirection = {
-  fd: 1 | 2;
+  fd: 1 | 2; // 1 = stdout, 2 = stderr
   file: string;
   append: boolean;
 };
 
-// Redirection Detection Logic:
-// Extracts redirection operators and their targets from the token list
+/**
+ * Scans the token list for a redirection operator (>, 1>, >>, 2>, 2>>).
+ * Removes the operator and its target filename from the token list and
+ * returns both the cleaned tokens and the redirection descriptor.
+ */
 function extractRedirection(tokens: string[]): {
   tokens: string[];
   redirection: Redirection | null;
 } {
   for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
-
-    const match = token.match(/^([12]?)(>>|>)$/);
+    const match = tokens[i].match(/^([12]?)(>>|>)$/);
     if (!match) continue;
 
     if (i === tokens.length - 1) {
       throw new Error("syntax error: no file specified");
     }
 
-    const fd = match[1] === "2" ? 2 : 1; // default stdout
-    const append = match[2] === ">>";
-    const file = tokens[i + 1];
-
-    const newTokens = [...tokens];
-    newTokens.splice(i, 2);
-
-    return {
-      tokens: newTokens,
-      redirection: { fd, file, append },
+    const redirection: Redirection = {
+      fd: match[1] === "2" ? 2 : 1,
+      append: match[2] === ">>",
+      file: tokens[i + 1],
     };
+
+    // Remove the operator and the filename from the token list
+    const cleanedTokens = [...tokens];
+    cleanedTokens.splice(i, 2);
+
+    return { tokens: cleanedTokens, redirection };
   }
 
   return { tokens, redirection: null };
 }
 
-// ---------- Shell Loop ----------
+// ============================================================
+// COMMAND RUNNER
+// ============================================================
 
 function runCommand(input: string) {
   let tokens = parseInput(input.trim());
-
   if (tokens.length === 0) return;
 
+  // Pull out any redirection before we look at the command
   let redirection: Redirection | null = null;
-
   try {
-    const result = extractRedirection(tokens);
-    tokens = result.tokens;
-    redirection = result.redirection;
+    ({ tokens, redirection } = extractRedirection(tokens));
   } catch (err: any) {
     console.error(err.message);
     rl.prompt();
@@ -295,56 +316,75 @@ function runCommand(input: string) {
   }
 
   const [command, ...args] = tokens;
-
   if (!command) {
     rl.prompt();
     return;
   }
 
-  // BUILT-IN COMMANDS
-  if (builtInCommands[command]) {
-    if (redirection) {
-      const stream = fs.createWriteStream(redirection.file, {
-        flags: redirection.append ? "a" : "w",
-      });
-
-      const originalLog = console.log;
-      const originalError = console.error;
-
-      if (redirection.fd === 1) {
-        console.log = (...data: any[]) => stream.write(data.join(" ") + "\n");
-      } else {
-        console.error = (...data: any[]) => stream.write(data.join(" ") + "\n");
-      }
-
-      builtInCommands[command](args);
-
-      console.log = originalLog;
-      console.error = originalError;
-      stream.end();
-    } else {
-      builtInCommands[command](args);
-    }
-
+  // --- Built-in command ---
+  if (command in builtInCommands) {
+    runBuiltin(command, args, redirection);
     if (command !== "exit") rl.prompt();
     return;
   }
 
-  // ---- EXTERNAL COMMAND ----
-  const executableInfo = findExecutable(command);
-
-  if (!executableInfo) {
+  // --- External command ---
+  const found = findExecutable(command);
+  if (!found) {
     console.error(`${command}: command not found`);
     rl.prompt();
     return;
   }
 
-  const child = execFile(command, args, (error) => {
-    if (error && error.code !== 0) {
-      // Let stderr handle it
-    }
-    rl.prompt();
+  runExternal(command, args, redirection);
+}
+
+/**
+ * Runs a built-in command, optionally redirecting its stdout or stderr
+ * to a file by temporarily swapping out console.log / console.error.
+ */
+function runBuiltin(
+  command: string,
+  args: string[],
+  redirection: Redirection | null,
+) {
+  if (!redirection) {
+    builtInCommands[command](args);
+    return;
+  }
+
+  const stream = fs.createWriteStream(redirection.file, {
+    flags: redirection.append ? "a" : "w",
   });
+
+  // Temporarily redirect the appropriate console method to the file
+  const originalLog = console.log;
+  const originalError = console.error;
+
+  if (redirection.fd === 1) {
+    console.log = (...data: any[]) => stream.write(data.join(" ") + "\n");
+  } else {
+    console.error = (...data: any[]) => stream.write(data.join(" ") + "\n");
+  }
+
+  builtInCommands[command](args);
+
+  // Restore the original console methods
+  console.log = originalLog;
+  console.error = originalError;
+  stream.end();
+}
+
+/**
+ * Spawns an external process, optionally piping its stdout or stderr
+ * to a file instead of the terminal.
+ */
+function runExternal(
+  command: string,
+  args: string[],
+  redirection: Redirection | null,
+) {
+  const child = execFile(command, args);
 
   if (redirection) {
     const stream = fs.createWriteStream(redirection.file, {
@@ -369,10 +409,3 @@ function runCommand(input: string) {
     child.on("close", () => rl.prompt());
   }
 }
-
-rl.setPrompt("$ ");
-rl.prompt();
-
-rl.on("line", (line) => {
-  runCommand(line);
-});

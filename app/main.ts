@@ -390,6 +390,16 @@ function runBuiltin(
 
   const writeFlag = redirection.append ? "a" : "w";
 
+  // Always create/touch the target file upfront so it exists even if
+  // the command never writes to the redirected file descriptor.
+  // e.g. `echo hi 2> file` — echo never calls console.error, but the
+  // shell must still create the file (matching real shell behaviour).
+  if (!redirection.append) {
+    fs.writeFileSync(redirection.file, "", { flag: "w" });
+  } else if (!fs.existsSync(redirection.file)) {
+    fs.writeFileSync(redirection.file, "", { flag: "a" });
+  }
+
   // Temporarily replace the appropriate console method with one that
   // writes synchronously to the target file.
   const originalLog = console.log;

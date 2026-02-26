@@ -36,7 +36,7 @@ function completer(line: string): [string[], string] {
 
   // Only complete the first word/token (command)
   // Allow completion if we're still editing the first word
-  if (words.length > 1 && words[0] !== currentWord) {
+  if (words.length > 1) {
     tabPressCount = 0;
     return [[], currentWord];
   }
@@ -46,7 +46,9 @@ function completer(line: string): [string[], string] {
 
   const allCommands = [...builtins, ...executables];
 
-  const matches = allCommands.filter((cmd) => cmd.startsWith(currentWord));
+  const matches = allCommands
+    .filter((cmd) => cmd.startsWith(currentWord))
+    .sort();
 
   if (matches.length === 0) {
     process.stdout.write("\x07"); // always bell if no matches
@@ -76,12 +78,9 @@ function completer(line: string): [string[], string] {
   }
 
   // Second TAB → print matches
-  const compareFn = (a: string, b: string) => {
-    return a < b ? -1 : a > b ? 1 : 0;
-  };
   console.log();
-  console.log(matches.sort(compareFn).join("  "));
-  process.stdout.write(`$ ${currentWord}`);
+  console.log(matches.join("  "));
+  process.stdout.write(`$ ${line}`);
 
   tabPressCount = 0;
   return [[], currentWord];

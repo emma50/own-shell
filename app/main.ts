@@ -64,7 +64,7 @@ let tabCount = 0;
 function completer(line: string): [string[], string] {
   const builtins = Object.keys(builtInCommands);
   const executables = getExecutablesFromPath();
-  const allCommands = [...builtins, ...executables].sort();
+  const allCommands = [...new Set([...builtins, ...executables])].sort();
 
   // If there is a space, we're completing arguments.
   // If there is NO space, we're completing the command itself.

@@ -58,19 +58,48 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
 };
 
-function completer(line: string): [string[] | string, string] {
+let lastPrefix = "";
+let tabCount = 0;
+
+function completer(line: string): [string[], string] {
   const builtins = Object.keys(builtInCommands);
   const executables = getExecutablesFromPath();
   const allCommands = [...builtins, ...executables].sort();
 
   const matches = allCommands.filter((cmd) => cmd.startsWith(line));
 
-  if (matches.length === 1) {
-    process.stdout.write("\x07"); // always bell if no matches
-    return [matches[0] + " ", line];
+  // Reset tab counter if prefix changed
+  if (line !== lastPrefix) {
+    tabCount = 0;
+    lastPrefix = line;
   }
 
-  return [matches, line];
+  if (matches.length === 0) {
+    process.stdout.write("\x07");
+    return [[], line];
+  }
+
+  if (matches.length === 1) {
+    tabCount = 0;
+    return [[matches[0] + " "], line];
+  }
+
+  // Multiple matches
+  tabCount++;
+
+  if (tabCount === 1) {
+    process.stdout.write("\x07");
+    return [[], line];
+  }
+
+  // Second TAB
+  console.log();
+  console.log(matches.join("  "));
+  rl.prompt();
+  rl.write(line);
+
+  tabCount = 0;
+  return [[], line];
 }
 
 const rl = createInterface({

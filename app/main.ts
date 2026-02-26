@@ -80,7 +80,7 @@ function completer(line: string): [string[], string] {
   };
   console.log();
   console.log(matches.sort(compareFn).join("  "));
-  process.stdout.write(`$ ${currentWord} `);
+  process.stdout.write(`$ ${currentWord}`);
 
   tabPressCount = 0;
   return [[], currentWord];

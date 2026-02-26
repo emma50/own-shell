@@ -45,7 +45,7 @@ function completer(line: string): [string[], string] {
 
   const allCommands = [...builtins, ...executables];
 
-  const matches = allCommands.filter((cmd) => cmd.startsWith(line));
+  const matches = allCommands.filter((cmd) => cmd.startsWith(currentWord));
 
   if (matches.length === 0) {
     process.stdout.write("\x07"); // always bell if no matches

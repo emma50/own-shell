@@ -74,11 +74,13 @@ function completer(line: string): [string[], string] {
     lastPrefix = line;
   }
 
+  //  No matches
   if (matches.length === 0) {
     process.stdout.write("\x07");
-    return [[], line];
+    return [[], ""];
   }
 
+  // Single match
   if (matches.length === 1) {
     tabCount = 0;
     return [[matches[0] + " "], line];
@@ -89,18 +91,20 @@ function completer(line: string): [string[], string] {
 
   if (tabCount === 1) {
     process.stdout.write("\x07");
-    return [[], line];
+    return [[], ""];
   }
 
   // Second TAB
   console.log();
   console.log(matches.join("  "));
-  rl.prompt();
-  rl.write(null, { ctrl: true, name: "u" }); // clear line (Ctrl+U)
-  rl.write(line);
+  console.log(`$ ${line}`);
+
+  // rl.prompt();
+  // rl.write(line);
 
   tabCount = 0;
-  return [[], line];
+
+  return [[], ""];
 }
 
 const rl = createInterface({

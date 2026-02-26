@@ -260,6 +260,16 @@ function parseInput(input: string): string[] {
       continue;
     }
 
+    // Unquoted pipe → flush current token, emit "|" as its own token
+    if (!inSingleQuote && !inDoubleQuote && char === "|") {
+      if (current.length > 0) {
+        tokens.push(current);
+        current = "";
+      }
+      tokens.push("|");
+      continue;
+    }
+
     current += char;
   }
 
@@ -335,42 +345,98 @@ function extractRedirection(tokens: string[]): {
 // COMMAND RUNNER
 // ============================================================
 
+/**
+ * Splits a token list on the `|` operator into pipeline stages.
+ * e.g. ["cat", "foo.txt", "|", "grep", "bar"] → [["cat", "foo.txt"], ["grep", "bar"]]
+ */
+function splitPipeline(tokens: string[]): string[][] {
+  const stages: string[][] = [];
+  let current: string[] = [];
+
+  for (const token of tokens) {
+    if (token === "|") {
+      stages.push(current);
+      current = [];
+    } else {
+      current.push(token);
+    }
+  }
+
+  stages.push(current);
+  return stages;
+}
+
 function runCommand(input: string) {
   let tokens = parseInput(input.trim());
   if (tokens.length === 0) return;
 
-  // Pull out any redirection before we look at the command
-  let redirection: Redirection | null = null;
-  try {
-    ({ tokens, redirection } = extractRedirection(tokens));
-  } catch (err: any) {
-    console.error(err.message);
-    rl.prompt();
-    return;
+  const stages = splitPipeline(tokens);
+
+  // No pipe — existing single-command path
+  if (stages.length === 1) {
+    // Pull out any redirection before we look at the command
+    let redirection: Redirection | null = null;
+    try {
+      ({ tokens, redirection } = extractRedirection(tokens));
+    } catch (err: any) {
+      console.error(err.message);
+      rl.prompt();
+      return;
+    }
+
+    const [command, ...args] = tokens;
+    if (!command) {
+      rl.prompt();
+      return;
+    }
+
+    // --- Built-in command ---
+    if (command in builtInCommands) {
+      runBuiltin(command, args, redirection);
+      if (command !== "exit") rl.prompt();
+      return;
+    }
+
+    // --- External command ---
+    const found = findExecutable(command);
+    if (!found) {
+      console.error(`${command}: command not found`);
+      rl.prompt();
+      return;
+    }
+
+    runExternal(command, args, redirection);
   }
 
-  const [command, ...args] = tokens;
-  if (!command) {
-    rl.prompt();
-    return;
+  // Pipeline — spawn each stage and wire stdout → stdin
+  runPipeline(stages);
+}
+
+/**
+ * Runs a two-or-more stage pipeline by spawning each command and
+ * connecting the stdout of each process to the stdin of the next.
+ * Only external commands are supported in pipelines.
+ */
+function runPipeline(stages: string[][]) {
+  const processes = stages.map(([command, ...args]) => {
+    if (!findExecutable(command)) {
+      console.error(`${command}: command not found`);
+    }
+    return execFile(command, args);
+  });
+
+  // Wire stdout of stage N → stdin of stage N+1
+  for (let i = 0; i < processes.length - 1; i++) {
+    processes[i].stdout?.pipe(processes[i + 1].stdin!);
   }
 
-  // --- Built-in command ---
-  if (command in builtInCommands) {
-    runBuiltin(command, args, redirection);
-    if (command !== "exit") rl.prompt();
-    return;
-  }
+  // First process reads from the terminal
+  // Last process writes to the terminal
+  processes[processes.length - 1].stdout?.pipe(process.stdout);
+  processes[processes.length - 1].stderr?.pipe(process.stderr);
 
-  // --- External command ---
-  const found = findExecutable(command);
-  if (!found) {
-    console.error(`${command}: command not found`);
-    rl.prompt();
-    return;
-  }
-
-  runExternal(command, args, redirection);
+  // Show prompt once the last process finishes
+  processes[processes.length - 1].on("close", () => rl.prompt());
 }
 
 /**

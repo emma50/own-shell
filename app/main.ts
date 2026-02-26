@@ -34,8 +34,9 @@ function completer(line: string): [string[], string] {
   const words = line.split(" ");
   const currentWord = words[words.length - 1];
 
-  // Only complete the first word (command)
-  if (words.length > 1) {
+  // Only complete the first word/token (command)
+  // Allow completion if we're still editing the first word
+  if (words.length > 1 && words[0] !== currentWord) {
     tabPressCount = 0;
     return [[], currentWord];
   }

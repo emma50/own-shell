@@ -293,14 +293,14 @@ function runCommand(input: string) {
     redirection = result.redirection;
   } catch (err: any) {
     console.error(err.message);
-    prompt();
+    rl.prompt();
     return;
   }
 
   const [command, ...args] = tokens;
 
   if (!command) {
-    prompt();
+    rl.prompt();
     return;
   }
 
@@ -329,7 +329,7 @@ function runCommand(input: string) {
       builtInCommands[command](args);
     }
 
-    if (command !== "exit") prompt();
+    if (command !== "exit") rl.prompt();
     return;
   }
 
@@ -338,7 +338,7 @@ function runCommand(input: string) {
 
   if (!executableInfo) {
     console.error(`${command}: command not found`);
-    prompt();
+    rl.prompt();
     return;
   }
 
@@ -346,7 +346,7 @@ function runCommand(input: string) {
     if (error && error.code !== 0) {
       // Let stderr handle it
     }
-    prompt();
+    rl.prompt();
   });
 
   if (redirection) {
@@ -364,19 +364,18 @@ function runCommand(input: string) {
 
     child.on("close", () => {
       stream.end();
-      prompt();
+      rl.prompt();
     });
   } else {
     child.stdout?.pipe(process.stdout);
     child.stderr?.pipe(process.stderr);
-    child.on("close", () => prompt());
+    child.on("close", () => rl.prompt());
   }
 }
 
-function prompt() {
-  rl.question("$ ", (answer) => {
-    runCommand(answer);
-  });
-}
+rl.setPrompt("$ ");
+rl.prompt();
 
-prompt();
+rl.on("line", (line) => {
+  runCommand(line);
+});

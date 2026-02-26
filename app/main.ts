@@ -71,7 +71,7 @@ function completer(line: string): [string[], string] {
 
   const builtins = Object.keys(builtInCommands);
   const executables = getExecutablesFromPath();
-  console.log("Builtin commands: ", builtins);
+  // console.log("Builtin commands: ", builtins);
 
   const allCommands = [...builtins, ...executables];
 

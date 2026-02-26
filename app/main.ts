@@ -422,21 +422,24 @@ function runCommand(input: string) {
  * to stdin of the next. Only external commands are supported in pipelines.
  */
 function runPipeline(stages: string[][]) {
-  const processes = stages.map(([command, ...args]) => {
-    if (!findExecutable(command)) {
-      console.error(`${command}: command not found`);
-    }
-    return spawn(command, args, { stdio: "pipe" });
+  const last = stages.length - 1;
+
+  const processes = stages.map(([command, ...args], i) => {
+    // First process inherits terminal stdin (it may read from files or user).
+    // Middle and last processes get a piped stdin fed by the previous stage.
+    // Last process inherits terminal stdout/stderr so output goes to screen.
+    const stdio: ("pipe" | "inherit")[] = [
+      i === 0 ? "inherit" : "pipe", // stdin
+      i === last ? "inherit" : "pipe", // stdout
+      "inherit", // stderr always to terminal
+    ];
+    return spawn(command, args, { stdio });
   });
 
   // Wire stdout of stage N → stdin of stage N+1
   for (let i = 0; i < processes.length - 1; i++) {
-    processes[i].stdout?.pipe(processes[i + 1].stdin!);
+    processes[i].stdout!.pipe(processes[i + 1].stdin!);
   }
-
-  // Last process writes to the terminal
-  processes[processes.length - 1].stdout?.pipe(process.stdout);
-  processes[processes.length - 1].stderr?.pipe(process.stderr);
 
   // Show prompt once the last process finishes
   processes[processes.length - 1].on("close", () => rl.prompt());

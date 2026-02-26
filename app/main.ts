@@ -66,6 +66,7 @@ function completer(line: string): [string[], string] {
   const executables = getExecutablesFromPath();
   const allCommands = [...builtins, ...executables].sort();
 
+  // Only complete the LAST token
   const tokens = line.split(/\s+/);
   const lastToken = tokens[tokens.length - 1]; // only last token
   const matches = allCommands.filter((cmd) => cmd.startsWith(lastToken));
@@ -79,23 +80,22 @@ function completer(line: string): [string[], string] {
   //  No matches -> ring bell and do nothing
   if (matches.length === 0) {
     process.stdout.write("\x07");
-    return [[], line];
+    return [[], lastToken];
   }
 
   // Single match -> replace last token, add trailing space
   if (matches.length === 1) {
-    tokens[tokens.length - 1] = matches[0]; // replace only last token
     tabCount = 0;
     lastPrefix = "";
     // The first array element is **what readline inserts**:
-    return [[tokens.join(" ") + " "], line];
+    return [[matches[0] + " "], lastToken];
   }
 
   // Multiple matches → first TAB: bell, second TAB: show options
   tabCount++;
   if (tabCount === 1) {
     process.stdout.write("\x07");
-    return [[], line];
+    return [[], lastToken];
   }
 
   // Second TAB → print all matches, show prompt again
@@ -104,7 +104,7 @@ function completer(line: string): [string[], string] {
   console.log(`$ ${line}`);
   tabCount = 0;
 
-  return [[], line];
+  return [[], lastToken];
 }
 
 const rl = createInterface({

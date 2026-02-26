@@ -372,50 +372,54 @@ function runCommand(input: string) {
 
   const stages = splitPipeline(tokens);
 
-  // No pipe — existing single-command path
-  if (stages.length === 1) {
-    // Pull out any redirection before we look at the command
-    let redirection: Redirection | null = null;
-    try {
-      ({ tokens, redirection } = extractRedirection(tokens));
-    } catch (err: any) {
-      console.error(err.message);
-      rl.prompt();
-      return;
-    }
-
-    const [command, ...args] = tokens;
-    if (!command) {
-      rl.prompt();
-      return;
-    }
-
-    // --- Built-in command ---
-    if (command in builtInCommands) {
-      runBuiltin(command, args, redirection);
-      if (command !== "exit") rl.prompt();
-      return;
-    }
-
-    // --- External command ---
-    const found = findExecutable(command);
-    if (!found) {
-      console.error(`${command}: command not found`);
-      rl.prompt();
-      return;
-    }
-
-    runExternal(command, args, redirection);
+  // Pipeline path — two or more commands connected with |
+  if (stages.length > 1) {
+    runPipeline(stages);
+    return;
   }
+
+  // Single command path — extract redirection then dispatch
+  let stageTokens = stages[0];
+  // Pull out any redirection before we look at the command
+  let redirection: Redirection | null = null;
+  try {
+    ({ tokens: stageTokens, redirection } = extractRedirection(stageTokens));
+  } catch (err: any) {
+    console.error(err.message);
+    rl.prompt();
+    return;
+  }
+
+  const [command, ...args] = stageTokens;
+  if (!command) {
+    rl.prompt();
+    return;
+  }
+
+  // --- Built-in command ---
+  if (command in builtInCommands) {
+    runBuiltin(command, args, redirection);
+    if (command !== "exit") rl.prompt();
+    return;
+  }
+
+  // --- External command ---
+  const found = findExecutable(command);
+  if (!found) {
+    console.error(`${command}: command not found`);
+    rl.prompt();
+    return;
+  }
+
+  runExternal(command, args, redirection);
 
   // Pipeline — spawn each stage and wire stdout → stdin
   runPipeline(stages);
 }
 
 /**
- * Runs a two-or-more stage pipeline by spawning each command and
- * connecting the stdout of each process to the stdin of the next.
- * Only external commands are supported in pipelines.
+ * Runs a two-or-more stage pipeline, connecting stdout of each process
+ * to stdin of the next. Only external commands are supported in pipelines.
  */
 function runPipeline(stages: string[][]) {
   const processes = stages.map(([command, ...args]) => {
@@ -430,7 +434,6 @@ function runPipeline(stages: string[][]) {
     processes[i].stdout?.pipe(processes[i + 1].stdin!);
   }
 
-  // First process reads from the terminal
   // Last process writes to the terminal
   processes[processes.length - 1].stdout?.pipe(process.stdout);
   processes[processes.length - 1].stderr?.pipe(process.stderr);

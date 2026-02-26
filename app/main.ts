@@ -67,30 +67,36 @@ function completer(line: string): [string[], string] {
   const allCommands = [...builtins, ...executables].sort();
 
   const tokens = line.split(/\s+/);
-  const prefix = tokens[tokens.length - 1]; // only last token
-  const matches = allCommands.filter((cmd) => cmd.startsWith(prefix));
+  const lastToken = tokens[tokens.length - 1]; // only last token
+  const matches = allCommands.filter((cmd) => cmd.startsWith(lastToken));
 
-  // Reset tab counter if prefix changed
-  if (prefix !== lastPrefix) {
+  // Reset tab counter if lastToken changed
+  if (lastToken !== lastPrefix) {
     tabCount = 0;
-    lastPrefix = prefix;
+    lastPrefix = lastToken;
   }
 
-  //  No matches
+  //  No matches -> ring bell and do nothing
   if (matches.length === 0) {
     process.stdout.write("\x07");
     return [[], ""];
   }
 
-  // Single match
+  // Single match -> replace last token, add trailing space
   if (matches.length === 1) {
-    tabCount = 0;
+    tokens[tokens.length - 1] = matches[0]; // replace only last token
     lastPrefix = "";
-    tokens[tokens.length - 1] = matches[0] + " "; // replace only last token
-    return [[tokens.join(" ")], tokens.join(" ")];
+    tabCount = 0;
+    return [
+      [tokens.join(" ") + " "],
+      tokens
+        .slice(0, tokens.length - 1)
+        .concat(matches[0])
+        .join(" ") + " ",
+    ];
   }
 
-  // Multiple matches
+  // Multiple matches → handle TAB counting
   tabCount++;
 
   if (tabCount === 1) {
@@ -98,7 +104,7 @@ function completer(line: string): [string[], string] {
     return [[], line];
   }
 
-  // Second TAB: show all options
+  // Second TAB → print all matches, show prompt again
   console.log();
   console.log(matches.join("  "));
   console.log(`$ ${line}`);

@@ -59,60 +59,25 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
 };
 
 function completer(line: string): [string[], string] {
-  const words = line.split(" ");
-  const currentWord = words[words.length - 1];
-
-  // Only complete the first word/token (command)
-  // Allow completion if we're still editing the first word
-  if (words.length > 1) {
-    tabPressCount = 0;
-    return [[], currentWord];
-  }
-
   const builtins = Object.keys(builtInCommands);
   const executables = getExecutablesFromPath();
-  // console.log("Builtin commands: ", builtins);
+  const allCommands = [...builtins, ...executables].sort();
 
-  const allCommands = [...builtins, ...executables];
-
-  const matches = allCommands
-    .filter((cmd) => cmd.startsWith(currentWord))
-    .sort();
+  const matches = allCommands.filter((cmd) => cmd.startsWith(line));
 
   if (matches.length === 0) {
     process.stdout.write("\x07"); // always bell if no matches
-    tabPressCount = 0;
-    return [[], currentWord];
+    return [[], line];
   }
-
-  // If prefix changed, reset counter
-  if (currentWord !== lastCompletionPrefix) {
-    lastCompletionPrefix = currentWord;
-    tabPressCount = 0;
-  }
-
-  tabPressCount++;
 
   // SINGLE MATCH → autocomplete immediately
   if (matches.length === 1) {
-    tabPressCount = 0;
-    return [[matches[0] + " "], currentWord];
+    return [[matches[0] + " "], line];
   }
 
-  // MULTIPLE MATCHES
-  if (tabPressCount === 1) {
-    // First TAB → bell only
-    process.stdout.write("\x07");
-    return [[], currentWord];
-  }
-
-  // Second TAB → print matches
-  console.log();
-  console.log(matches.join("  "));
-  process.stdout.write(`$ ${line}`);
-
-  tabPressCount = 0;
-  return [[], currentWord];
+  // MULTIPLE MATCHES → show options on first tab, cycle on subsequent tabs
+  process.stdout.write("\x07");
+  return [matches, line];
 }
 
 const rl = createInterface({

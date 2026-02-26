@@ -88,7 +88,7 @@ function completer(line: string): [string[], string] {
     tabCount = 0;
     lastPrefix = "";
     // The first array element is **what readline inserts**:
-    return [[matches[0] + " "], lastToken];
+    return [[matches[0] + " "], line];
   }
 
   // Multiple matches → first TAB: bell, second TAB: show options

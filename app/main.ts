@@ -65,19 +65,7 @@ function completer(line: string): [string[], string] {
 
   const matches = allCommands.filter((cmd) => cmd.startsWith(line));
 
-  if (matches.length === 0) {
-    process.stdout.write("\x07"); // always bell if no matches
-    return [[], line];
-  }
-
-  // SINGLE MATCH → autocomplete immediately
-  if (matches.length === 1) {
-    return [[matches[0] + " "], line];
-  }
-
-  // MULTIPLE MATCHES → show options on first tab, cycle on subsequent tabs
-  process.stdout.write("\x07");
-  return [matches, line];
+  return [matches.length === 1 ? [matches[0] + " "] : matches, line];
 }
 
 const rl = createInterface({

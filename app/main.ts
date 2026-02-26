@@ -96,6 +96,7 @@ function completer(line: string): [string[], string] {
   console.log();
   console.log(matches.join("  "));
   rl.prompt();
+  rl.write(null, { ctrl: true, name: "u" }); // clear line (Ctrl+U)
   rl.write(line);
 
   tabCount = 0;

@@ -375,7 +375,8 @@ function runCommand(input: string) {
 
 /**
  * Runs a built-in command, optionally redirecting its stdout or stderr
- * to a file by temporarily swapping out console.log / console.error.
+ * to a file. Uses synchronous file writes so the data is guaranteed to
+ * be on disk before the next command runs.
  */
 function runBuiltin(
   command: string,
@@ -387,18 +388,23 @@ function runBuiltin(
     return;
   }
 
-  const stream = fs.createWriteStream(redirection.file, {
-    flags: redirection.append ? "a" : "w",
-  });
+  const writeFlag = redirection.append ? "a" : "w";
 
-  // Temporarily redirect the appropriate console method to the file
+  // Temporarily replace the appropriate console method with one that
+  // writes synchronously to the target file.
   const originalLog = console.log;
   const originalError = console.error;
 
+  const writeToFile = (...data: any[]) => {
+    fs.writeFileSync(redirection.file, data.join(" ") + "\n", {
+      flag: writeFlag,
+    });
+  };
+
   if (redirection.fd === 1) {
-    console.log = (...data: any[]) => stream.write(data.join(" ") + "\n");
+    console.log = writeToFile;
   } else {
-    console.error = (...data: any[]) => stream.write(data.join(" ") + "\n");
+    console.error = writeToFile;
   }
 
   builtInCommands[command](args);
@@ -406,7 +412,6 @@ function runBuiltin(
   // Restore the original console methods
   console.log = originalLog;
   console.error = originalError;
-  stream.end();
 }
 
 /**

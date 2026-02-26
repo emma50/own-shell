@@ -83,7 +83,8 @@ function completer(line: string): [string[], string] {
   // Single match
   if (matches.length === 1) {
     tabCount = 0;
-    return [[matches[0] + " "], line];
+    lastPrefix = "";
+    return [[matches[0] + " "], ""];
   }
 
   // Multiple matches
@@ -98,9 +99,6 @@ function completer(line: string): [string[], string] {
   console.log();
   console.log(matches.join("  "));
   console.log(`$ ${line}`);
-
-  // rl.prompt();
-  // rl.write(line);
 
   tabCount = 0;
 

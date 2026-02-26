@@ -79,26 +79,20 @@ function completer(line: string): [string[], string] {
   //  No matches -> ring bell and do nothing
   if (matches.length === 0) {
     process.stdout.write("\x07");
-    return [[], ""];
+    return [[], line];
   }
 
   // Single match -> replace last token, add trailing space
   if (matches.length === 1) {
     tokens[tokens.length - 1] = matches[0]; // replace only last token
-    lastPrefix = "";
     tabCount = 0;
-    return [
-      [tokens.join(" ") + " "],
-      tokens
-        .slice(0, tokens.length - 1)
-        .concat(matches[0])
-        .join(" ") + " ",
-    ];
+    lastPrefix = "";
+    // The first array element is **what readline inserts**:
+    return [[tokens.join(" ") + " "], line];
   }
 
-  // Multiple matches → handle TAB counting
+  // Multiple matches → first TAB: bell, second TAB: show options
   tabCount++;
-
   if (tabCount === 1) {
     process.stdout.write("\x07");
     return [[], line];
@@ -108,7 +102,6 @@ function completer(line: string): [string[], string] {
   console.log();
   console.log(matches.join("  "));
   console.log(`$ ${line}`);
-
   tabCount = 0;
 
   return [[], line];

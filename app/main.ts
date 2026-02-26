@@ -1,5 +1,5 @@
 import { createInterface } from "readline";
-import { execFile, execFileSync } from "child_process";
+import { execFile, execFileSync, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 
@@ -422,7 +422,7 @@ function runPipeline(stages: string[][]) {
     if (!findExecutable(command)) {
       console.error(`${command}: command not found`);
     }
-    return execFile(command, args);
+    return spawn(command, args, { stdio: "pipe" });
   });
 
   // Wire stdout of stage N → stdin of stage N+1

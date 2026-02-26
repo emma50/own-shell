@@ -58,14 +58,19 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
 };
 
-function completer(line: string): [string[], string] {
+function completer(line: string): [string[] | string, string] {
   const builtins = Object.keys(builtInCommands);
   const executables = getExecutablesFromPath();
   const allCommands = [...builtins, ...executables].sort();
 
   const matches = allCommands.filter((cmd) => cmd.startsWith(line));
 
-  return [matches.length === 1 ? [matches[0] + " "] : matches, line];
+  if (matches.length === 1) {
+    process.stdout.write("\x07"); // always bell if no matches
+    return [matches[0] + " ", line];
+  }
+
+  return [matches, line];
 }
 
 const rl = createInterface({

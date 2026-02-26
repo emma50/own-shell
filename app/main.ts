@@ -70,6 +70,26 @@ let lastPrefix = "";
 let tabCount = 0;
 
 /**
+ * Returns the longest string that all entries in `words` start with.
+ * e.g. ["xyz_foo", "xyz_foo_bar", "xyz_foo_bar_baz"] → "xyz_foo"
+ * e.g. ["abc", "abd"] → "ab"
+ */
+function getLongestCommonPrefix(words: string[]): string {
+  if (words.length === 0) return "";
+
+  let lcp = words[0];
+
+  for (let i = 1; i < words.length; i++) {
+    // Shrink lcp until it matches the start of the next word
+    while (!words[i].startsWith(lcp)) {
+      lcp = lcp.slice(0, -1);
+    }
+  }
+
+  return lcp;
+}
+
+/**
  * readline calls this function every time the user presses TAB.
  * It must return [completionList, prefix] where readline replaces
  * the prefix in the line with the common prefix of completionList.
@@ -77,7 +97,8 @@ let tabCount = 0;
  * Behaviour:
  *  - No matches       → ring bell, do nothing
  *  - Single match     → complete immediately with a trailing space
- *  - Multiple matches → 1st TAB: bell, 2nd TAB: print all options
+ *  - Multiple matches, LCP > prefix → complete to the LCP silently
+ *  - Multiple matches, LCP = prefix → 1st TAB: bell, 2nd TAB: print all options
  */
 function completer(line: string): [string[], string] {
   // Build a deduplicated, sorted list of all known commands
@@ -112,7 +133,20 @@ function completer(line: string): [string[], string] {
     return [[matches[0] + " "], prefix]; // trailing space signals "done"
   }
 
-  // --- Multiple matches ---
+  // Find the longest common prefix (LCP) shared by all matches.
+  // e.g. ["xyz_foo", "xyz_foo_bar", "xyz_foo_bar_baz"] → "xyz_foo"
+  const lcp = getLongestCommonPrefix(matches);
+
+  if (lcp.length > prefix.length) {
+    // We can complete further without ambiguity — advance to the LCP.
+    // Don't ring the bell; don't show options. Just extend the input.
+    tabCount = 0;
+    lastPrefix = lcp;
+    return [[lcp], prefix];
+  }
+
+  // LCP == prefix: no further completion possible without guessing.
+  // 1st TAB → ring bell. 2nd TAB → show all options.
   tabCount++;
 
   if (tabCount === 1) {

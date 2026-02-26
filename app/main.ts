@@ -30,6 +30,34 @@ function getExecutablesFromPath(): string[] {
   return Array.from(executables);
 }
 
+const builtInCommands: Record<string, (args: string[]) => void> = {
+  echo: (args) => console.log(args.join(" ")),
+  pwd: () => console.log(process.cwd()),
+  cd: (args) => {
+    if (args.length === 0) {
+      console.error("cd: missing operand");
+    } else {
+      changeDirectory(args[0]);
+    }
+  },
+  type: (args) => {
+    const [first] = args;
+    if (!first) return;
+
+    if (Object.keys(builtInCommands).includes(first)) {
+      console.log(`${first} is a shell builtin`);
+    } else {
+      const executableInfo = findExecutable(first);
+      if (executableInfo?.location) {
+        console.log(`${first} is ${executableInfo.location}`);
+      } else {
+        console.log(`${first}: not found`);
+      }
+    }
+  },
+  exit: () => rl.close(),
+};
+
 function completer(line: string): [string[], string] {
   const words = line.split(" ");
   const currentWord = words[words.length - 1];
@@ -43,6 +71,7 @@ function completer(line: string): [string[], string] {
 
   const builtins = Object.keys(builtInCommands);
   const executables = getExecutablesFromPath();
+  console.log("Builtin commands: ", builtins);
 
   const allCommands = [...builtins, ...executables];
 
@@ -209,34 +238,6 @@ function findExecutable(executable: string) {
 }
 
 // ---------- Command Handlers ----------
-
-const builtInCommands: Record<string, (args: string[]) => void> = {
-  echo: (args) => console.log(args.join(" ")),
-  pwd: () => console.log(process.cwd()),
-  cd: (args) => {
-    if (args.length === 0) {
-      console.error("cd: missing operand");
-    } else {
-      changeDirectory(args[0]);
-    }
-  },
-  type: (args) => {
-    const [first] = args;
-    if (!first) return;
-
-    if (Object.keys(builtInCommands).includes(first)) {
-      console.log(`${first} is a shell builtin`);
-    } else {
-      const executableInfo = findExecutable(first);
-      if (executableInfo?.location) {
-        console.log(`${first} is ${executableInfo.location}`);
-      } else {
-        console.log(`${first}: not found`);
-      }
-    }
-  },
-  exit: () => rl.close(),
-};
 
 // Redirection handling: supports ">", "1>", ">>", and "2>"
 // Describe which file descriptor (1 = stdout, 2 = stderr), file path, and whether to append.

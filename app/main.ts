@@ -505,7 +505,7 @@ function runExternal(
   args: string[],
   redirection: Redirection | null,
 ) {
-  const child = execFile(command, args);
+  const child = spawn(command, args, { stdio: "pipe" });
 
   if (redirection) {
     const stream = fs.createWriteStream(redirection.file, {

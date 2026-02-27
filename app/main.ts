@@ -1,5 +1,5 @@
 import { createInterface } from "readline";
-import { execFile, execFileSync, spawn } from "child_process";
+import { execFile, execFileSync, spawn, spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
@@ -497,36 +497,47 @@ function runBuiltin(
 }
 
 /**
- * Spawns an external process, optionally piping its stdout or stderr
- * to a file instead of the terminal.
+ * Runs an external command.
+ *
+ * - With redirection: uses spawnSync so output is captured and written to the
+ *   file synchronously — no race condition with the next buffered command.
+ * - Without redirection: uses async spawn so streaming output (e.g. tail -f)
+ *   works correctly, with inherited stdout/stderr going straight to the terminal.
  */
 function runExternal(
   command: string,
   args: string[],
   redirection: Redirection | null,
 ) {
-  const child = spawn(command, args, { stdio: ["inherit", "pipe", "pipe"] });
-
   if (redirection) {
-    const stream = fs.createWriteStream(redirection.file, {
-      flags: redirection.append ? "a" : "w",
-    });
+    // Run synchronously so the file is fully written before the next command.
+    const result = spawnSync(command, args, { encoding: "buffer" });
+
+    const outBuf = result.stdout ?? Buffer.alloc(0);
+    const errBuf = result.stderr ?? Buffer.alloc(0);
+    const fileFlag = redirection.append ? "a" : "w";
 
     if (redirection.fd === 1) {
-      child.stdout?.pipe(stream);
-      child.stderr?.pipe(process.stderr);
+      // stdout → file, stderr → terminal
+      fs.writeFileSync(redirection.file, new Uint8Array(outBuf), {
+        flag: fileFlag,
+      });
+      process.stderr.write(new Uint8Array(errBuf));
     } else {
-      child.stderr?.pipe(stream);
-      child.stdout?.pipe(process.stdout);
+      // stderr → file, stdout → terminal
+      fs.writeFileSync(redirection.file, new Uint8Array(errBuf), {
+        flag: fileFlag,
+      });
+      process.stdout.write(new Uint8Array(outBuf));
     }
 
-    child.on("close", () => {
-      stream.end();
-      rl.prompt();
-    });
+    rl.prompt();
   } else {
-    child.stdout?.pipe(process.stdout);
-    child.stderr?.pipe(process.stderr);
+    // No redirection — stream output directly to the terminal.
+    // Use async spawn so long-running commands (tail -f, etc.) work.
+    const child = spawn(command, args, {
+      stdio: ["inherit", "inherit", "inherit"],
+    });
     child.on("close", () => rl.prompt());
   }
 }

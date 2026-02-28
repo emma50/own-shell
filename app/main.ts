@@ -133,6 +133,7 @@ function completer(line: string): [string[], string] {
     return [[matches[0] + " "], prefix]; // trailing space signals "done"
   }
 
+  // --- Multiple Matches ---
   // Find the longest common prefix (LCP) shared by all matches.
   // e.g. ["xyz_foo", "xyz_foo_bar", "xyz_foo_bar_baz"] → "xyz_foo"
   const lcp = getLongestCommonPrefix(matches);
@@ -260,15 +261,15 @@ function parseInput(input: string): string[] {
       continue;
     }
 
-    // Unquoted pipe → flush current token, emit "|" as its own token
-    if (!inSingleQuote && !inDoubleQuote && char === "|") {
-      if (current.length > 0) {
-        tokens.push(current);
-        current = "";
-      }
-      tokens.push("|");
-      continue;
-    }
+    // // Unquoted pipe → flush current token, emit "|" as its own token
+    // if (!inSingleQuote && !inDoubleQuote && char === "|") {
+    //   if (current.length > 0) {
+    //     tokens.push(current);
+    //     current = "";
+    //   }
+    //   tokens.push("|");
+    //   continue;
+    // }S
 
     current += char;
   }
@@ -413,8 +414,8 @@ function runCommand(input: string) {
 
   runExternal(command, args, redirection);
 
-  // Pipeline — spawn each stage and wire stdout → stdin
-  runPipeline(stages);
+  // // Pipeline — spawn each stage and wire stdout → stdin
+  // runPipeline(stages);
 }
 
 /**
@@ -425,6 +426,8 @@ function runPipeline(stages: string[][]) {
   const last = stages.length - 1;
 
   const processes = stages.map(([command, ...args], i) => {
+    const last = stages.length - 1;
+
     // First process inherits terminal stdin (it may read from files or user).
     // Middle and last processes get a piped stdin fed by the previous stage.
     // Last process inherits terminal stdout/stderr so output goes to screen.
@@ -437,12 +440,12 @@ function runPipeline(stages: string[][]) {
   });
 
   // Wire stdout of stage N → stdin of stage N+1
-  for (let i = 0; i < processes.length - 1; i++) {
+  for (let i = 0; i < last; i++) {
     processes[i].stdout!.pipe(processes[i + 1].stdin!);
   }
 
   // Show prompt once the last process finishes
-  processes[processes.length - 1].on("close", () => rl.prompt());
+  processes[last].on("close", () => rl.prompt());
 }
 
 /**
@@ -465,7 +468,7 @@ function runBuiltin(
   // Always create/touch the target file upfront so it exists even if
   // the command never writes to the redirected file descriptor.
   // e.g. `echo hi 2> file` — echo never calls console.error, but the
-  // shell must still create the file (matching real shell behaviour).
+  // shell must still create the file (matching real shell behavior).
   if (!redirection.append) {
     fs.writeFileSync(redirection.file, "", { flag: "w" });
   } else if (!fs.existsSync(redirection.file)) {

@@ -406,33 +406,61 @@ function runCommand(input: string) {
 }
 
 /**
- * Runs a two-or-more stage pipeline, connecting stdout of each process
- * to stdin of the next. Only external commands are supported in pipelines.
+ * Runs a pipeline of two or more commands, supporting both external
+ * commands and built-ins at any position in the pipeline.
+ *
+ * Strategy:
+ *  - External commands are spawned as child processes with stdio pipes.
+ *  - Built-in commands are executed in-process; their output is captured
+ *    into a Buffer which is then fed into the next stage's stdin.
  */
 function runPipeline(stages: string[][]) {
   const last = stages.length - 1;
 
-  const processes = stages.map(([command, ...args], i) => {
-    const last = stages.length - 1;
+  // Resolve each stage to either a spawned child or a captured buffer
+  type ChildStage = { kind: "child"; proc: ReturnType<typeof spawn> };
+  type BufferStage = { kind: "buffer"; data: Buffer };
+  type Stage = ChildStage | BufferStage;
 
-    // First process inherits terminal stdin (it may read from files or user).
-    // Middle and last processes get a piped stdin fed by the previous stage.
-    // Last process inherits terminal stdout/stderr so output goes to screen.
-    const stdio: ("pipe" | "inherit")[] = [
-      i === 0 ? "inherit" : "pipe", // stdin
-      i === last ? "inherit" : "pipe", // stdout
-      "inherit", // stderr always to terminal
-    ];
-    return spawn(command, args, { stdio });
+  const resolved: Stage[] = stages.map(([command, ...args]) => {
+    if (command in builtInCommands) {
+      // Built-ins run in-process; capture their output now
+      return { kind: "buffer", data: runBuiltinToBuffer(command, args) };
+    }
+    return { kind: "child", proc: spawn(command, args, { stdio: "pipe" }) };
   });
 
-  // Wire stdout of stage N → stdin of stage N+1
+  // Wire stages together: feed each stage's output into the next's stdin
   for (let i = 0; i < last; i++) {
-    processes[i].stdout!.pipe(processes[i + 1].stdin!);
+    const current = resolved[i];
+    const next = resolved[i + 1];
+
+    // Get the output of the current stage as a readable source
+    const outputData = current.kind === "buffer" ? current.data : null; // child stdout stream handled via .pipe() below
+
+    if (next.kind === "child") {
+      if (current.kind === "buffer") {
+        // Write the buffer into the child's stdin and close it
+        next.proc.stdin!.end(current.data);
+      } else {
+        // Pipe child stdout directly into next child's stdin
+        current.proc.stdout!.pipe(next.proc.stdin!);
+      }
+    }
+    // buffer→buffer: the next buffer was already computed eagerly above,
+    // so nothing to wire (built-ins don't consume stdin in our model)
   }
 
-  // Show prompt once the last process finishes
-  processes[last].on("close", () => rl.prompt());
+  // Send the last stage's output to the terminal
+  const lastStage = resolved[last];
+  if (lastStage.kind === "buffer") {
+    process.stdout.write(new Uint8Array(lastStage.data));
+    rl.prompt();
+  } else {
+    lastStage.proc.stdout!.pipe(process.stdout);
+    lastStage.proc.stderr!.pipe(process.stderr);
+    lastStage.proc.on("close", () => rl.prompt());
+  }
 }
 
 /**
@@ -484,6 +512,24 @@ function runBuiltin(
   // Restore the original console methods
   console.log = originalLog;
   console.error = originalError;
+}
+
+/**
+ * Runs a built-in command and captures its stdout into a Buffer.
+ * Used when a built-in appears inside a pipeline and its output
+ * needs to be piped to the next stage instead of printed directly.
+ */
+function runBuiltinToBuffer(command: string, args: string[]): Buffer {
+  const lines: string[] = [];
+
+  const originalLog = console.log;
+  console.log = (...data: any[]) => lines.push(data.join(" "));
+
+  builtInCommands[command](args);
+
+  console.log = originalLog;
+
+  return Buffer.from(lines.join("\n") + (lines.length > 0 ? "\n" : ""));
 }
 
 /**

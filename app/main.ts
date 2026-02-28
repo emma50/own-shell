@@ -1,5 +1,5 @@
 import { createInterface } from "readline";
-import { execFile, execFileSync, spawn, spawnSync } from "child_process";
+import { execFileSync, spawn, spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
@@ -261,16 +261,6 @@ function parseInput(input: string): string[] {
       continue;
     }
 
-    // // Unquoted pipe → flush current token, emit "|" as its own token
-    // if (!inSingleQuote && !inDoubleQuote && char === "|") {
-    //   if (current.length > 0) {
-    //     tokens.push(current);
-    //     current = "";
-    //   }
-    //   tokens.push("|");
-    //   continue;
-    // }S
-
     current += char;
   }
 
@@ -413,9 +403,6 @@ function runCommand(input: string) {
   }
 
   runExternal(command, args, redirection);
-
-  // // Pipeline — spawn each stage and wire stdout → stdin
-  // runPipeline(stages);
 }
 
 /**

@@ -4,6 +4,21 @@ import fs from "fs";
 import path from "path";
 
 // ============================================================
+// TAB COMPLETION
+// ============================================================
+
+// Track state between tab presses
+let lastPrefix = "";
+let tabCount = 0;
+
+// ============================================================
+// HISTORY
+// ============================================================
+
+// Every command entered by the user is appended here in order.
+const history: string[] = [];
+
+// ============================================================
 // PATH EXECUTABLES
 // ============================================================
 
@@ -58,16 +73,15 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
     }
   },
 
+  history: () => {
+    history.forEach((cmd, i) => {
+      // Right-align the index in a 4-wide column, matching bash's format
+      console.log(`${String(i + 1).padStart(4)}  ${cmd}`);
+    });
+  },
+
   exit: () => rl.close(),
 };
-
-// ============================================================
-// TAB COMPLETION
-// ============================================================
-
-// Track state between tab presses
-let lastPrefix = "";
-let tabCount = 0;
 
 /**
  * Returns the longest string that all entries in `words` start with.
@@ -178,7 +192,12 @@ const rl = createInterface({
 rl.setPrompt("$ ");
 rl.prompt();
 
-rl.on("line", (line) => runCommand(line));
+rl.on("line", (line) => {
+  const trimmed = line.trim();
+  // Don't add empty lines to the history, but do add everything else verbatim (including duplicates). Record every command and add to history
+  if (trimmed) history.push(trimmed);
+  runCommand(line);
+});
 
 // ============================================================
 // UTILITY FUNCTIONS

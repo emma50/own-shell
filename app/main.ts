@@ -73,11 +73,26 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
     }
   },
 
-  history: () => {
-    history.forEach((cmd, i) => {
-      // Right-align the index in a 4-wide column, matching bash's format
-      console.log(`${String(i + 1).padStart(4)}  ${cmd}`);
-    });
+  history: (args) => {
+    if (args.length === 0) {
+      history.forEach((cmd, i) => {
+        // Right-align the index in a 4-wide column, matching bash's format
+        console.log(`${String(i + 1).padStart(4)}  ${cmd}`);
+      });
+      return;
+    } else {
+      const num = Number(args[0]);
+      if (num && num > 0) {
+        const limit = num + 1;
+
+        const recentHistory = history.slice(-limit);
+        recentHistory.forEach((cmd, i) => {
+          // Right-align the index in a 4-wide column, matching bash's format
+          console.log(`${String(i + 1).padStart(4)}  ${cmd}`);
+        });
+      }
+      return;
+    }
   },
 
   exit: () => rl.close(),

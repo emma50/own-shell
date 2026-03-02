@@ -221,7 +221,12 @@ function completer(line: string): [string[], string] {
           return fs
             .readdirSync(absDir) // list files in the target directory
             .filter((f) => f.startsWith(filePart)) // filter to those matching the prefix
-            .map((f) => dir + f) // re-attach the directory prefix so the completion is a full path
+            .map((f) => {
+              // Append "/" to directories so they display correctly in the list
+              const fullPath = path.join(absDir, f);
+              const isDir = fs.statSync(fullPath).isDirectory();
+              return dir + f + (isDir ? "/" : "");
+            })
             .sort();
         } catch {
           return [];

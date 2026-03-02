@@ -150,7 +150,16 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
     });
   },
 
-  exit: () => rl.close(),
+  exit: () => {
+    if (HISTFILE) {
+      try {
+        fs.writeFileSync(HISTFILE, history.join("\n") + "\n");
+      } catch {
+        // Ignore write errors on exit
+      }
+    }
+    rl.close();
+  },
 };
 
 /**

@@ -93,6 +93,22 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
       return;
     }
 
+    if (args[0] === "-w") {
+      // Write all in-memory history to file, one command per line + trailing newline
+      const filePath = args[1];
+      if (!filePath) {
+        console.error("history: -w: missing filename");
+        return;
+      }
+      try {
+        fs.writeFileSync(filePath, history.join("\n"));
+        // fs.writeFileSync(filePath, history.join("\n") + "\n");
+      } catch {
+        console.error(`history: ${filePath}: cannot write file`);
+      }
+      return;
+    }
+
     const n = args[0] ? parseInt(args[0], 10) : history.length;
     const start = Math.max(0, history.length - n);
     history.slice(start).forEach((cmd, i) => {

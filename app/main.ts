@@ -22,6 +22,21 @@ const history: string[] = [];
 // so repeated calls only append the new commands since the last -a.
 let historyLastAppended = 0;
 
+// On startup, load history from HISTFILE if set
+const HISTFILE = process.env.HISTFILE;
+if (HISTFILE) {
+  try {
+    const lines = fs
+      .readFileSync(HISTFILE, "utf8")
+      .split("\n")
+      .filter((line) => line.trim() !== "");
+    history.push(...lines);
+    historyLastAppended = history.length; // treat loaded entries as already "appended"
+  } catch {
+    // File doesn't exist yet — that's fine, start with empty history
+  }
+}
+
 // ============================================================
 // PATH EXECUTABLES
 // ============================================================

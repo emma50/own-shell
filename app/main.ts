@@ -210,10 +210,23 @@ function completer(line: string): [string[], string] {
   // When completing an argument, match files in the current directory.
   // When completing the first word, match known commands.
   const matches = isCompletingArgument
-    ? fs
-        .readdirSync(process.cwd())
-        .filter((f) => f.startsWith(prefix))
-        .sort()
+    ? (() => {
+        // Split prefix into directory part and filename part
+        // e.g. "path/to/f" → dir="path/to/", file="f"
+        const slashIdx = prefix.lastIndexOf("/");
+        const dir = slashIdx >= 0 ? prefix.slice(0, slashIdx + 1) : "";
+        const filePart = slashIdx >= 0 ? prefix.slice(slashIdx + 1) : prefix;
+        const absDir = path.resolve(process.cwd(), dir || ".");
+        try {
+          return fs
+            .readdirSync(absDir) // list files in the target directory
+            .filter((f) => f.startsWith(filePart)) // filter to those matching the prefix
+            .map((f) => dir + f) // re-attach the directory prefix so the completion is a full path
+            .sort();
+        } catch {
+          return [];
+        }
+      })()
     : [
         ...new Set([
           ...Object.keys(builtInCommands),

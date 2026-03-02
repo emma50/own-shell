@@ -254,6 +254,7 @@ function completer(line: string): [string[], string] {
     lastPrefix = "";
 
     const match = matches[0];
+    // If we're completing an argument, check if it's a directory to decide whether to add a trailing slash or space
     if (isCompletingArgument) {
       const absPath = path.resolve(process.cwd(), match);
 
@@ -266,7 +267,8 @@ function completer(line: string): [string[], string] {
         // ignore stat errors
       }
     }
-    return [[match + " "], prefix]; // trailing space signals "done"
+    // File or command → trailing space
+    return [[match + " "], prefix];
   }
 
   // --- Multiple Matches ---

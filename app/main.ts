@@ -231,7 +231,12 @@ function completer(line: string): [string[], string] {
 
           // "display" matches shown to the user — directories get a trailing slash
           const display = entries.map((f) => {
-            const isDir = fs.statSync(path.join(absDir, f)).isDirectory();
+            let isDir = false;
+            try {
+              isDir = fs.statSync(path.join(absDir, f)).isDirectory();
+            } catch {
+              /* treat as file if stat fails */
+            }
             return dir + f + (isDir ? "/" : "");
           });
 

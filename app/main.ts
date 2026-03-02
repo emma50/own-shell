@@ -252,7 +252,21 @@ function completer(line: string): [string[], string] {
   if (matches.length === 1) {
     tabCount = 0;
     lastPrefix = "";
-    return [[matches[0] + " "], prefix]; // trailing space signals "done"
+
+    const match = matches[0];
+    if (isCompletingArgument) {
+      const absPath = path.resolve(process.cwd(), match);
+
+      try {
+        if (fs.statSync(absPath).isDirectory()) {
+          // Directory → trailing slash, NO space
+          return [[match + "/"], prefix];
+        }
+      } catch {
+        // ignore stat errors
+      }
+    }
+    return [[match + " "], prefix]; // trailing space signals "done"
   }
 
   // --- Multiple Matches ---

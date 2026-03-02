@@ -221,28 +221,22 @@ function completer(line: string): [string[], string] {
         const filePart = slashIdx >= 0 ? prefix.slice(slashIdx + 1) : prefix;
         const absDir = path.resolve(process.cwd(), dir || ".");
         try {
-          const entries = fs
-            .readdirSync(absDir)
-            .filter((f) => f.startsWith(filePart))
-            .sort();
+          // Use { withFileTypes: true } to get Dirent objects — avoids a
+          // separate statSync call and works regardless of symlinks/permissions
+          const dirents = fs
+            .readdirSync(absDir, { withFileTypes: true })
+            .filter((d) => d.name.startsWith(filePart))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+          const entries = dirents.map((d) => d.name);
 
           // "bare" matches used for LCP/prefix logic — no trailing slash
           const bare = entries.map((f) => dir + f);
 
-          // "display" matches shown to the user — directories get a trailing slash
-          const display = entries.map((f) => {
-            let isDir = false;
-            try {
-              isDir = fs.statSync(path.join(absDir, f)).isDirectory();
-            } catch {
-              /* treat as file if stat fails */
-            }
-            return dir + f + (isDir ? "/" : "");
+          displayMatches = dirents.map((d) => {
+            return dir + d.name + (d.isDirectory() ? "/" : "");
           });
 
-          // Attach display labels as a parallel property so the completer
-          // can use bare values for logic but display values for printing
-          (bare as any)._display = display;
           return bare;
         } catch {
           return [];

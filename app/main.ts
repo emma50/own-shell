@@ -199,13 +199,29 @@ function completer(line: string): [string[], string] {
     ...new Set([...Object.keys(builtInCommands), ...getExecutablesFromPath()]),
   ].sort();
 
+  const isCompletingArgument = line.includes(" ");
+
   // If the line has no space we're completing the command name.
   // If it does have a space we're completing the last argument.
   const prefix = line.includes(" ")
     ? line.slice(line.lastIndexOf(" ") + 1)
     : line;
 
-  const matches = allCommands.filter((cmd) => cmd.startsWith(prefix));
+  // When completing an argument, match files in the current directory.
+  // When completing the first word, match known commands.
+  const matches = isCompletingArgument
+    ? fs
+        .readdirSync(process.cwd())
+        .filter((f) => f.startsWith(prefix))
+        .sort()
+    : [
+        ...new Set([
+          ...Object.keys(builtInCommands),
+          ...getExecutablesFromPath(),
+        ]),
+      ]
+        .sort()
+        .filter((cmd) => cmd.startsWith(prefix));
 
   // Reset the tab-press counter whenever the user types a different prefix
   if (prefix !== lastPrefix) {

@@ -101,8 +101,7 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
         return;
       }
       try {
-        fs.writeFileSync(filePath, history.join("\n"));
-        // fs.writeFileSync(filePath, history.join("\n") + "\n");
+        fs.writeFileSync(filePath, history.join("\n") + "\n");
       } catch {
         console.error(`history: ${filePath}: cannot write file`);
       }

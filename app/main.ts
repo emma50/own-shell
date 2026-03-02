@@ -313,10 +313,13 @@ function completer(line: string): [string[], string] {
     return [[], prefix];
   }
 
-  // Second TAB → show all options, then redraw the prompt + current input
-  console.log();
-  console.log((displayMatches.length ? displayMatches : matches).join("  "));
-  console.log(`$ ${line}`);
+  // Second TAB → show all options, then let readline redraw the prompt itself
+  process.stdout.write("\n");
+  process.stdout.write(
+    (displayMatches.length ? displayMatches : matches).join("  ") + "\n",
+  );
+  (rl as any).line = line; // tell readline what's currently on the line
+  (rl as any)._refreshLine(); // redraw prompt + current input correctly
   tabCount = 0;
 
   return [[], prefix];

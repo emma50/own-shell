@@ -74,6 +74,25 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
   },
 
   history: (args) => {
+    if (args[0] === "-r") {
+      // Read history from file and append non-empty lines to in-memory history
+      const filePath = args[1];
+      if (!filePath) {
+        console.error("history: -r: missing filename");
+        return;
+      }
+      try {
+        const lines = fs
+          .readFileSync(filePath, "utf8")
+          .split("\n")
+          .filter((line) => line.trim() !== "");
+        history.push(...lines);
+      } catch {
+        console.error(`history: ${filePath}: cannot read file`);
+      }
+      return;
+    }
+
     const n = args[0] ? parseInt(args[0], 10) : history.length;
     const start = Math.max(0, history.length - n);
     history.slice(start).forEach((cmd, i) => {

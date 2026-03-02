@@ -207,6 +207,9 @@ function completer(line: string): [string[], string] {
     ? line.slice(line.lastIndexOf(" ") + 1)
     : line;
 
+  // Parallel display list: same entries but directories suffixed with "/"
+  let displayMatches: string[] = [];
+
   // When completing an argument, match files in the current directory.
   // When completing the first word, match known commands.
   const matches = isCompletingArgument
@@ -218,28 +221,40 @@ function completer(line: string): [string[], string] {
         const filePart = slashIdx >= 0 ? prefix.slice(slashIdx + 1) : prefix;
         const absDir = path.resolve(process.cwd(), dir || ".");
         try {
-          return fs
-            .readdirSync(absDir) // list files in the target directory
-            .filter((f) => f.startsWith(filePart)) // filter to those matching the prefix
-            .map((f) => {
-              // Append "/" to directories so they display correctly in the list
-              const fullPath = path.join(absDir, f);
-              const isDir = fs.statSync(fullPath).isDirectory();
-              return dir + f + (isDir ? "/" : "");
-            })
+          const entries = fs
+            .readdirSync(absDir)
+            .filter((f) => f.startsWith(filePart))
             .sort();
+
+          // "bare" matches used for LCP/prefix logic — no trailing slash
+          const bare = entries.map((f) => dir + f);
+
+          // "display" matches shown to the user — directories get a trailing slash
+          const display = entries.map((f) => {
+            const isDir = fs.statSync(path.join(absDir, f)).isDirectory();
+            return dir + f + (isDir ? "/" : "");
+          });
+
+          // Attach display labels as a parallel property so the completer
+          // can use bare values for logic but display values for printing
+          (bare as any)._display = display;
+          return bare;
         } catch {
           return [];
         }
       })()
-    : [
-        ...new Set([
-          ...Object.keys(builtInCommands),
-          ...getExecutablesFromPath(),
-        ]),
-      ]
-        .sort()
-        .filter((cmd) => cmd.startsWith(prefix));
+    : (() => {
+        const cmds = [
+          ...new Set([
+            ...Object.keys(builtInCommands),
+            ...getExecutablesFromPath(),
+          ]),
+        ]
+          .sort()
+          .filter((cmd) => cmd.startsWith(prefix));
+        displayMatches = cmds; // commands have no special suffix
+        return cmds;
+      })();
 
   // Reset the tab-press counter whenever the user types a different prefix
   if (prefix !== lastPrefix) {
@@ -301,7 +316,7 @@ function completer(line: string): [string[], string] {
 
   // Second TAB → show all options, then redraw the prompt + current input
   console.log();
-  console.log(matches.join("  "));
+  console.log((displayMatches.length ? displayMatches : matches).join("  "));
   console.log(`$ ${line}`);
   tabCount = 0;
 

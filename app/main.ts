@@ -18,6 +18,10 @@ let tabCount = 0;
 // Every command entered by the user is appended here in order.
 const history: string[] = [];
 
+// Tracks how many history entries have already been written via -a,
+// so repeated calls only append the new commands since the last -a.
+let historyLastAppended = 0;
+
 // ============================================================
 // PATH EXECUTABLES
 // ============================================================
@@ -104,6 +108,22 @@ const builtInCommands: Record<string, (args: string[]) => void> = {
         fs.writeFileSync(filePath, history.join("\n") + "\n");
       } catch {
         console.error(`history: ${filePath}: cannot write file`);
+      }
+      return;
+    }
+
+    if (args[0] === "-a") {
+      const filePath = args[1];
+      if (!filePath) {
+        console.error("history: -a: missing filename");
+        return;
+      }
+      try {
+        const newEntries = history.slice(historyLastAppended);
+        fs.appendFileSync(filePath, newEntries.join("\n") + "\n");
+        historyLastAppended = history.length;
+      } catch {
+        console.error(`history: ${filePath}: cannot append to file`);
       }
       return;
     }
